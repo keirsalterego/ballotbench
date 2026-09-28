@@ -89,6 +89,19 @@ def sign(record, key=None):
     return {"record": record, "signature": b64url(key.sign(canonical(record)))}
 
 
+class DuplicateKey(ValueError):
+    pass
+
+
+def _no_duplicate_keys(pairs):
+    # json.loads keeps the last of two equal keys, but a reader skimming the
+    # text may see the first: {"team": "First Place", ..., "team": "real"}.
+    keys = [k for k, _ in pairs]
+    if len(keys) != len(set(keys)):
+        raise DuplicateKey()
+    return dict(pairs)
+
+
 def verify(text, public=None):
     """Check a pasted record. Returns (valid, reason, record or None). Never
     raises on bad input: anything malformed is simply not valid."""
@@ -96,7 +109,9 @@ def verify(text, public=None):
     if not isinstance(text, str) or len(text) > MAX_LENGTH:
         return False, "That's too long to be a record.", None
     try:
-        doc = json.loads(text)
+        doc = json.loads(text, object_pairs_hook=_no_duplicate_keys)
+    except DuplicateKey:
+        return False, "That record repeats a field, so what it says is ambiguous. Paste it exactly as issued.", None
     except (ValueError, RecursionError):
         return False, "That isn't JSON. Paste the whole record, braces included.", None
     if not (isinstance(doc, dict) and isinstance(doc.get("record"), dict) and isinstance(doc.get("signature"), str)):

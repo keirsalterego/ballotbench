@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 
+from portal import pairwise
 from portal.calibration import bootstrap, fit, signal_test
 from portal.models import Event, Membership
 from portal.results import submitted_reviews
@@ -152,6 +153,21 @@ class Command(BaseCommand):
             ok &= passed
             out(f"  {'PASS' if passed else 'FAIL'}  {label}: {diff:.1e}, ranking {'identical' if same else 'CHANGED'}")
 
+        out("\nSecond opinion: the rubric read as pairwise picks (Bradley-Terry, portal/pairwise.py):")
+        pairs = pairwise.picks(obs)
+        silent = sorted(str(names.get(j)) for j, jf in result.judges.items() if jf.n < 2 or jf.flag == "constant")
+        strengths = pairwise.fit(pairs, items=ranked)
+        bt_order = sorted(ranked, key=lambda p: (-strengths[p], p))
+        out(f"  {len(pairs)} picks; no picks from {', '.join(silent)} (one review, or every pair tied)")
+        out(f"  Kendall's tau with the calibrated ranking {pairwise.kendall(bt_order, cal_order):.3f}, "
+            f"with raw means {pairwise.kendall(bt_order, raw_order):.3f}")
+        squashed = [(j, p, y ** 2 if j == busiest else y) for j, p, y in obs]
+        same_picks = sorted(pairwise.picks(squashed)) == sorted(pairs)
+        moved_q = max(abs(result.projects[p].quality - fit(squashed).projects[p].quality) for p in ranked)
+        ok &= same_picks
+        out(f"  {'PASS' if same_picks else 'FAIL'}  {names.get(busiest)}'s scores squared (not a shift or stretch): "
+            f"picks identical; the calibration's q moves by up to {moved_q:.2f}, since it only undoes linear habits")
+
         out("\nBenchmark on synthetic events with a known true order (40 projects, 12 judges, 3 reviews each,")
         out("one harsh judge who only sees the strongest projects). Kendall's tau against the truth:")
         rows = []
@@ -160,9 +176,13 @@ class Command(BaseCommand):
             s_fit = fit(s_obs)
             model = sorted(s_fit.projects, key=lambda p: -s_fit.projects[p].quality)
             raw = sorted(s_fit.projects, key=lambda p: -s_fit.projects[p].raw_mean)
-            rows.append((kendall(model, truth), kendall(raw, truth), kendall(zscore_order(s_obs), truth)))
-        avg = [sum(r[i] for r in rows) / len(rows) for i in range(3)]
-        out(f"  calibration {avg[0]:.3f}   raw means {avg[1]:.3f}   per-judge z-scores {avg[2]:.3f}   (mean of 20 events)")
+            bt = pairwise.fit(pairwise.picks(s_obs), items=list(s_fit.projects))
+            bt_order = sorted(bt, key=lambda p: (-bt[p], p))
+            rows.append((kendall(model, truth), kendall(raw, truth), kendall(zscore_order(s_obs), truth),
+                         kendall(bt_order, truth)))
+        avg = [sum(r[i] for r in rows) / len(rows) for i in range(4)]
+        out(f"  calibration {avg[0]:.3f}   raw means {avg[1]:.3f}   per-judge z-scores {avg[2]:.3f}   "
+            f"pairwise picks {avg[3]:.3f}   (mean of 20 events)")
         out(f"  calibration beats raw means in {sum(r[0] > r[1] for r in rows)} of 20, "
             f"z-scores in {sum(r[0] > r[2] for r in rows)} of 20\n")
         out("Every invariance check holds." if ok else "SOME INVARIANCE CHECK FAILED.")

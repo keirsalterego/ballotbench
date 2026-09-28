@@ -14,7 +14,7 @@ from rest_framework import permissions, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from . import audit
+from . import audit, pairwise
 from .access import db_now, is_organizer
 from .calibration import bootstrap, digest, fit, signal_test
 from .models import CalibratedProject, CalibrationRun, Event, JudgeCalibration, Review
@@ -76,6 +76,17 @@ def run_calibration(event, actor=None, request=None):
     return run
 
 
+def second_opinion(event, ranked):
+    """Rank the ranked projects by the rubric read as pairwise picks
+    (portal/pairwise.py), from the current submitted reviews."""
+    criteria = list(event.criteria.all())
+    obs = [(r.assignment.judge_id, r.assignment.project_id, y) for r in submitted_reviews(event)
+           if (y := weighted_score(r, criteria)) is not None]
+    strengths = pairwise.fit(pairwise.picks(obs), items=ranked)
+    order = sorted(ranked, key=lambda p: (-strengths[p], p))
+    return {p: i for i, p in enumerate(order, 1)}
+
+
 def ranking(run):
     return (run.projects.select_related("project__team", "project__track")
             .order_by("rank", "excluded", "-quality", "project_id"))
@@ -89,8 +100,10 @@ def calibration_page(request, event):
         return redirect("calibration", slug=event.slug)
     run = event.calibration_runs.order_by("-pk").first()
     rows = list(ranking(run)) if run else []
+    pairwise_rank = second_opinion(event, [r.project_id for r in rows if r.rank]) if run else {}
     for row in rows:
         row.moved = (row.raw_rank - row.rank) if row.rank and row.raw_rank else None
+        row.pairwise_rank = pairwise_rank.get(row.project_id)
     judges = (run.judges.select_related("judge").order_by("flag", "judge__email") if run else [])
     return render(request, "portal/organizer/calibration.html", {
         "event": event, "run": run, "rows": rows, "judges": judges,

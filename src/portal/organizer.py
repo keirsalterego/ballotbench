@@ -10,7 +10,8 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.db.models import Count, ProtectedError, RestrictedError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from rest_framework.exceptions import APIException
@@ -71,6 +72,10 @@ class EventForm(forms.ModelForm):
                            ("voting_open", "voting_close")):
             if data.get(start) and data.get(end) and data[start] >= data[end]:
                 self.add_error(end, "must be after the opening time")
+        close = data.get("submissions_close")
+        for start in ("judging_open", "voting_open"):
+            if close and data.get(start) and data[start] < close:
+                self.add_error(start, "can't be before submissions close")
         return data
 
 
@@ -124,6 +129,7 @@ def add_track(request, event):
             with guarded():
                 track = Track.objects.create(event=event, name=name)
             audit.record("track.create", request=request, event=event, obj=track, after={"name": name})
+            messages.success(request, "Saved.")
         except IntegrityError:
             messages.error(request, f"There is already a track called {name}.")
     return redirect("manage", slug=event.slug)
@@ -133,11 +139,21 @@ def add_track(request, event):
 @require_POST
 def delete_track(request, event, pk):
     track = get_object_or_404(event.tracks, pk=pk)
+    # A judge with no tracks judges any track, so removing someone's only
+    # track would quietly widen what they're given.
+    stranded = (Membership.objects.filter(event=event, role=Membership.Role.JUDGE)
+                .annotate(n_tracks=Count("tracks")).filter(n_tracks=1, tracks=track).count())
     try:
         with guarded():
             track.delete()          # unsets projects' track: after the deadline the trigger refuses that
+            if stranded:            # the deadline refusal above wins; this one only rolls back
+                transaction.set_rollback(True)
     except APIException:
         messages.error(request, f"{track.name} has projects and submissions are closed, so it can't be deleted now.")
+        return redirect("manage", slug=event.slug)
+    if stranded:
+        messages.error(request, f"{track.name} is the only track of {stranded} judge{'s' if stranded != 1 else ''}, "
+                                f"who would then judge any track. Change their tracks under Judges first.")
         return redirect("manage", slug=event.slug)
     audit.record("track.delete", request=request, event=event, obj=track, before={"name": track.name})
     return redirect("manage", slug=event.slug)
@@ -154,6 +170,7 @@ def add_prize(request, event):
                 prize = Prize.objects.create(event=event, name=name, track=track,
                                              description=request.POST.get("description", "")[:2000])
             audit.record("prize.create", request=request, event=event, obj=prize, after={"name": name})
+            messages.success(request, "Saved.")
         except IntegrityError:
             messages.error(request, f"There is already a prize called {name}.")
     return redirect("manage", slug=event.slug)
@@ -196,6 +213,7 @@ def save_criterion(request, event, pk=None):
         return redirect("manage", slug=event.slug)
     audit.record("rubric.update" if pk else "rubric.create", request=request, event=event, obj=criterion,
                  before=before, after=audit.snapshot(criterion, ["key", "name", "weight", "min_value", "max_value"]))
+    messages.success(request, "Saved.")
     return redirect("manage", slug=event.slug)
 
 
@@ -208,6 +226,10 @@ def delete_criterion(request, event, pk):
             criterion.delete()
     except APIException as exc:
         messages.error(request, str(exc.detail))
+        return redirect("manage", slug=event.slug)
+    except (RestrictedError, ProtectedError):
+        # Scores point at the criterion, so Django refuses before the trigger does.
+        messages.error(request, "the rubric is frozen: this event already has scores")
         return redirect("manage", slug=event.slug)
     audit.record("rubric.delete", request=request, event=event, obj=criterion, before={"key": criterion.key})
     return redirect("manage", slug=event.slug)
@@ -277,4 +299,5 @@ def set_judge_tracks(request, event, pk):
     membership.tracks.set(tracks)
     audit.record("judge.tracks", request=request, event=event, obj=membership, before={"tracks": before},
                  after={"tracks": sorted(t.name for t in tracks)})
+    messages.success(request, "Saved.")
     return redirect("manage", slug=event.slug)

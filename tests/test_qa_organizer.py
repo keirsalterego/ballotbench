@@ -37,6 +37,13 @@ def scores_for(event, value=3):
 
 
 
+def test_deleting_a_scored_criterion_is_refused_not_a_500(web, event):
+    criterion = RubricCriterion.objects.filter(event=event, score__isnull=False).first()
+    response = web("organizer").post(f"/events/{EVENT}/manage/rubric/{criterion.pk}/delete", follow=True)
+    assert response.status_code == 200 and "the rubric is frozen" in response.content.decode()
+    assert RubricCriterion.objects.filter(pk=criterion.pk).exists()
+
+
 def test_a_draft_save_cannot_replace_a_submitted_review(api, web, event):
     a = submitted(event)
     before = {s.criterion_id: s.value for s in a.review.scores.all()}
@@ -73,6 +80,25 @@ def test_the_scoresheet_shows_the_whole_project(web, event):
         assert project.track.name in page
 
 
+def test_deleting_a_judges_only_track_is_refused(web, event):
+    track = Track.objects.create(event=event, name="Lonely track")
+    judge = Membership.objects.get(event=event, user__email=EMAILS["judge_a"], role="judge")
+    judge.tracks.set([track])
+    response = web("organizer").post(f"/events/{EVENT}/manage/tracks/{track.pk}/delete", follow=True)
+    assert "only track of 1 judge" in response.content.decode()
+    assert Track.objects.filter(pk=track.pk).exists()
+
+
+def test_judging_and_voting_cant_open_before_submissions_close():
+    form = EventForm({"name": "x", "slug": "x-order", "reviews_per_project": 3, "max_team_size": 4,
+                      "submissions_open": "2026-10-01T00:00", "submissions_close": "2026-10-05T00:00",
+                      "judging_open": "2026-10-04T00:00", "judging_close": "2026-10-09T00:00",
+                      "voting_open": "2026-10-04T00:00", "voting_close": "2026-10-09T00:00",
+                      "voting_mode": "account", "vote_credits": 25})
+    assert not form.is_valid()
+    assert "judging_open" in form.errors and "voting_open" in form.errors
+
+
 def test_recusal_needs_a_reason(web, event):
     open_judging(event)
     a = JudgeAssignment.objects.filter(event=event, judge__email=EMAILS["judge_a"], status="pending").first()
@@ -85,3 +111,8 @@ def test_recusal_needs_a_reason(web, event):
     assert JudgeAssignment.objects.get(pk=a.pk).status == "pending"
     web("judge_a").post(f"/judge/assignments/{a.pk}/recuse", {"reason": "my cousin's team"})
     assert JudgeAssignment.objects.get(pk=a.pk).status == "recused"
+
+
+def test_saving_a_track_says_so(web):
+    response = web("organizer").post(f"/events/{DEMO}/manage/tracks", {"name": "Saved track"}, follow=True)
+    assert "Saved." in response.content.decode()

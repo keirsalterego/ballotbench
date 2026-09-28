@@ -37,3 +37,15 @@ Three things, which the rest of this book keeps coming back to:
 - To run it for a real event: [Running it for real](reference/operations.md).
 
 The source is at <https://github.com/keirsalterego/ballotbench>, MIT licensed.
+
+## This book
+
+This book is published at <https://keirsalterego.github.io/ballotbench/>,
+rebuilt whenever the docs change on main. Its source is in `docs/`, and the
+chapters on judging, architecture and the data model include the
+repository's top-level documents directly, so there is one copy of each. To
+read it locally with [mdBook](https://rust-lang.github.io/mdBook/) 0.5:
+
+```sh
+mdbook serve docs --open
+```

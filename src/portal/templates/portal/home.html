@@ -34,7 +34,7 @@
 <h2>Take part</h2>
 <ul>
 {% for e in joinable %}
-  <li>{{ e.name }} <span class="muted">closes {{ e.submissions_close|date:"j M Y H:i" }} UTC</span>
+  <li>{{ e.name }} <span class="muted">{% if e.submissions_open > now %}opens {{ e.submissions_open|date:"j M Y H:i" }}{% else %}closes {{ e.submissions_close|date:"j M Y H:i" }}{% endif %} UTC</span>
     <form method="post" action="{% url 'event-join' e.slug %}" style="display:inline">{% csrf_token %}<button class="link">join as a participant</button></form></li>
 {% endfor %}
 </ul>

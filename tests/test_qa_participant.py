@@ -136,6 +136,19 @@ def test_after_the_deadline_the_project_page_is_read_only(web):
     assert "<button" not in page.split("<main>")[1].split("</main>")[0]
 
 
+def test_take_part_lists_only_events_still_taking_submissions(web):
+    now = db_now()
+    Event.objects.create(slug="qa-soon", name="QA soon", submissions_open=now + timedelta(days=1),
+                         submissions_close=now + timedelta(days=2))
+    Event.objects.create(slug="qa-over", name="QA over", submissions_open=now - timedelta(days=2),
+                         submissions_close=now - timedelta(days=1))
+    client = web()
+    client.force_login(User.objects.create_user("qa-new@example.org", "pw-for-tests-only"))
+    page = client.get("/me").content.decode()
+    assert "QA soon" in page and "opens" in page
+    assert "QA over" not in page and "Sample Hack" not in page
+
+
 def test_a_full_team_offers_no_invite_and_its_links_no_join_button(me, web):
     client, event, user = me
     Event.objects.filter(pk=event.pk).update(max_team_size=1)

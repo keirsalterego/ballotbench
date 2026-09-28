@@ -282,7 +282,26 @@ ranking. Where the two agree, trust the rank more; where they disagree, the
 project's rank depends on how you read the judges' scales, and its "could be"
 range will usually be wide as well.
 
-## 10. Spending the next reviews where they matter
+## 10. Does one judge decide the podium?
+
+Before publishing, the calibration page runs the whole fit again once per
+judge, each time without that judge's reviews, and lists every judge whose
+absence would change who is in the top three (or the top N, for N prizes).
+It takes about a second on the fixture.
+
+This finds the case the other checks can't: a judge the model trusts, whose
+scores agree with everyone else's on most projects, lifting one borderline
+project onto the podium. A lone contrarian is not a kingmaker: a judge whose
+scores run against the consensus is flagged discordant and carries no weight,
+so leaving them out changes nothing (`tests/test_calibration.py` plants both
+and checks each). A name on the list isn't an accusation; it says the podium
+rests on one person, which is where a second look, or one more review, is
+worth it.
+
+On the fixture, ten judges' absence would each swap one podium place,
+consistent with scores that carry no real signal.
+
+## 11. Spending the next reviews where they matter
 
 Once a calibration has run, the assignment page lists the projects whose
 plausible rank range crosses the prize line (the number of prizes, or the top
@@ -293,7 +312,7 @@ projects that can't win and can't miss; these are the ones where another
 opinion can change who wins. Run calibration again afterwards and the ranges
 narrow where it counted.
 
-## 11. Explaining a rank to the team
+## 12. Explaining a rank to the team
 
 After publication, each team can open *How your project was scored*: every
 review of their project with the judge anonymized ("Judge 2", shuffled per
@@ -305,7 +324,7 @@ project the same score, wrote one review, or scored against the consensus.
 It shows weighted totals only, no per-criterion scores, comments or names,
 and warns if scores changed after the published run.
 
-## 12. Publishing results
+## 13. Publishing results
 
 Results are hidden from everyone but the event's organizers until published,
 in the pages and the API (404 before then). Publishing freezes the result to
@@ -315,7 +334,7 @@ check the published ranking came from those scores. Later runs change nothing
 public until someone publishes again, and every run and publication is in the
 audit log.
 
-## 13. Known limits
+## 14. Known limits
 
 - **Linear judges only.** The model corrects a judge who is lenient or who
   spreads scores widely. It can't correct one who only compresses the top of

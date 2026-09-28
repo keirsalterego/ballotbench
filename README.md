@@ -114,11 +114,13 @@ they're published.
   each team can open a page that shows every review of its project with the
   judge anonymized: what that judge gave them, what that judge gives a typical
   project, and how much the review counted, including why some counted for
-  nothing. [How it works](JUDGING.md#11-explaining-a-rank-to-the-team).
+  nothing. [How it works](JUDGING.md#12-explaining-a-rank-to-the-team).
 - **Extra reviews go where they can change who wins.** After a calibration,
   the assignment page lists the projects whose plausible rank crosses the
   prize line and gives each exactly one more review, instead of spreading
   judge time evenly over projects that can't win and can't miss.
+- **A kingmaker check.** Before publishing, the fit runs again without each
+  judge in turn and lists anyone whose absence would change the podium.
 - **A second opinion no judge's habits can move.** Next to each calibrated
   rank is a Bradley-Terry ranking built only from which of two projects each
   judge scored higher.
@@ -163,7 +165,7 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
   limit**. Put it behind a proxy with TLS and rate limiting if it's public.
 - **Calibration assumes linear judges.** It can't correct a judge who only
   compresses the top of the scale, and it can't detect judges who collude.
-  See [known limits](JUDGING.md#13-known-limits).
+  See [known limits](JUDGING.md#14-known-limits).
 - **Deleting a closed event** is a management command (`delete_event`), not a
   button, because the database refuses to delete submitted projects after the
   deadline.

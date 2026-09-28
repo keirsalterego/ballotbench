@@ -113,6 +113,11 @@ def test_a_double_posted_new_project_makes_one(me):
     assert any("already has a project called Twice" in m for m in flashed(response))
 
 
+def test_the_page_disables_buttons_once_a_form_is_sent(web):
+    page = web().get("/projects").content.decode()
+    assert "e.submitter" in page and "b.disabled = true" in page
+
+
 def test_after_the_deadline_the_project_page_is_read_only(web):
     own = Project.objects.filter(event__slug=EVENT, team__members__user__email=EMAILS["participant"]).first()
     response = web("participant").get(f"/events/{EVENT}/project/{own.pk}/edit")

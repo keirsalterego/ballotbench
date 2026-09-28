@@ -146,7 +146,8 @@ class Command(BaseCommand):
             other = fit(moved_obs)
             diff = max(abs(result.projects[p].quality - other.projects[p].quality) for p in other.projects)
             same = [p for p in cal_order if p in other.projects] == sorted(
-                other.projects, key=lambda p: (-other.projects[p].quality, -result.projects[p].raw_mean, p))
+                (p for p in other.projects if p in cal_order),
+                key=lambda p: (-other.projects[p].quality, -result.projects[p].raw_mean, p))
             passed = diff < 1e-9 and same
             ok &= passed
             out(f"  {'PASS' if passed else 'FAIL'}  {label}: {diff:.1e}, ranking {'identical' if same else 'CHANGED'}")

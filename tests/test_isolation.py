@@ -77,7 +77,7 @@ def test_unknown_export_is_404(api):
 
 
 @pytest.mark.parametrize("page", ["manage", "manage/assign", "manage/progress", "manage/calibration", "manage/audit",
-                                  "manage/duplicates", "manage/exports"])
+                                  "manage/duplicates", "manage/exports", "manage/voting"])
 def test_organizer_pages_refuse_other_roles(web, page):
     url = f"/events/{EVENT}/{page}"
     assert web().get(url).status_code == 302          # to the login page
@@ -88,7 +88,8 @@ def test_organizer_pages_refuse_other_roles(web, page):
 
 def test_organizer_writes_refuse_other_roles(web):
     for url in (f"/events/{EVENT}/manage/tracks", f"/events/{EVENT}/manage/publish",
-                f"/events/{EVENT}/manage/assign", f"/events/{EVENT}/manage/invites"):
+                f"/events/{EVENT}/manage/assign", f"/events/{EVENT}/manage/invites",
+                f"/events/{EVENT}/manage/voting/voters/1"):
         assert web("judge_a").post(url, {"name": "x", "role": "judge"}).status_code == 403
 
 

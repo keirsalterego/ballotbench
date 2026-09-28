@@ -48,6 +48,8 @@ urlpatterns = [
     path("events/<slug:slug>/manage/duplicates", oversight.duplicates, name="duplicates"),
     path("events/<slug:slug>/manage/duplicates/<int:pk>", oversight.resolve_duplicate, name="duplicate-resolve"),
     path("events/<slug:slug>/manage/exports", oversight.exports_page, name="exports"),
+    path("events/<slug:slug>/manage/voting", voting.voting_page, name="voting-manage"),
+    path("events/<slug:slug>/manage/voting/voters/<int:pk>", voting.void_voter, name="voter-void"),
 
     path("judge", judge.queue, name="judge-queue"),
     path("judge/assignments/<int:pk>", judge.assignment_page, name="judge-assignment"),

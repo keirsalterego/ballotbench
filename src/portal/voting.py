@@ -365,3 +365,96 @@ def api_ballot(request, slug):
         except exceptions.APIException as exc:
             return Response({"detail": exc.detail}, status=exc.status_code)
     return Response(ballot_data(event, voter))
+
+
+# Tallies, and who may see them.
+
+def tallies(event):
+    """{project id: (votes, voters)} over ballots that aren't voided."""
+    rows = (Vote.objects.filter(voter__event=event, voter__voided_at__isnull=True)
+            .values("project").annotate(total=Sum("votes"), voters=Count("voter")))
+    return {r["project"]: (r["total"], r["voters"]) for r in rows}
+
+
+def counted_voters(event):
+    return Voter.objects.filter(event=event, voided_at__isnull=True, votes__isnull=False).distinct().count()
+
+
+def public_tallies(event):
+    """The tallies, if the public may see them: once results are published,
+    and never while voting is open."""
+    if event.voting_mode == Mode.OFF or not event.results_published_at or voting_is_open(event):
+        return None
+    return tallies(event)
+
+
+# The organizer's page: tallies, the abuse panel, voiding.
+
+def abuse_report(event):
+    """Every voter, with the flags a person should look at: a network with
+    several voters on it, an account made just before its ballot, and
+    ballots cast identically by several voters. Flags are never acted on
+    automatically; plenty of honest people share an office network."""
+    voters = list(Voter.objects.filter(event=event).select_related("user").prefetch_related("votes").order_by("pk"))
+    first_cast = dict(AuditLog.objects.filter(event=event, action="vote.cast", object_type="voter")
+                      .values("object_id").annotate(first=Min("ts")).values_list("object_id", "first"))
+    networks, ballots = defaultdict(list), defaultdict(list)
+    for v in voters:
+        v.ballot = ballot_of(v)
+        v.spent = cost(v.ballot)
+        v.network = ratelimit.network(v.ip, v4_bits=24)
+        v.flags = []
+        networks[v.network].append(v)
+        if v.ballot:
+            ballots[ballot_hash(v.ballot)].append(v)
+        cast_at = first_cast.get(str(v.pk))
+        if v.user and cast_at and cast_at - v.user.date_joined < NEW_ACCOUNT:
+            v.flags.append("new account")
+    clusters = sorted(((net, vs) for net, vs in networks.items() if net != "unknown" and len(vs) >= CLUSTER_SIZE),
+                      key=lambda item: -len(item[1]))
+    identical = sorted((vs for vs in ballots.values() if len(vs) >= CLUSTER_SIZE), key=len, reverse=True)
+    for _, vs in clusters:
+        for v in vs:
+            v.flags.append("cluster")
+    for vs in identical:
+        for v in vs:
+            v.flags.append("identical ballots")
+    return {"voters": sorted(voters, key=lambda v: (not v.flags, v.pk)), "clusters": clusters,
+            "identical": identical, "new_accounts": sum("new account" in v.flags for v in voters),
+            "duplicates": AuditLog.objects.filter(event=event, action="vote.duplicate_refused").count()}
+
+
+@organizer_required
+def voting_page(request, event):
+    counts = tallies(event)
+    projects = (Project.objects.filter(event=event, status=Project.Status.SUBMITTED, duplicate_of__isnull=True)
+                .select_related("team"))
+    rows = sorted(({"project": p, "votes": counts.get(p.pk, (0, 0))[0], "voters": counts.get(p.pk, (0, 0))[1]}
+                   for p in projects), key=lambda r: (-r["votes"], r["project"].title))
+    return render(request, "portal/organizer/voting.html", {
+        "event": event, "rows": rows, "counted": counted_voters(event), "closed": voting_closed_reason(event),
+        "voided": event.voters.filter(voided_at__isnull=False).count(), "cluster_size": CLUSTER_SIZE,
+        **abuse_report(event),
+    })
+
+
+@organizer_required
+@require_POST
+def void_voter(request, event, pk):
+    """Take a ballot out of the tallies, with a reason, or put it back.
+    The votes themselves are kept, so the decision can be undone."""
+    voter = get_object_or_404(event.voters, pk=pk)
+    before = {"voided_at": voter.voided_at, "voided_reason": voter.voided_reason}
+    if request.POST.get("action") == "unvoid":
+        voter.voided_at, voter.voided_reason, action = None, "", "vote.unvoid"
+    else:
+        reason = request.POST.get("reason", "").strip()[:300]
+        if not reason:
+            messages.error(request, "Say why you're voiding this ballot, for the audit log.")
+            return redirect("voting-manage", slug=event.slug)
+        voter.voided_at, voter.voided_reason, action = db_now(), reason, "vote.void"
+    voter.save(update_fields=["voided_at", "voided_reason"])
+    audit.record(action, request=request, event=event, obj=voter, before=before,
+                 after={"voided_at": voter.voided_at, "voided_reason": voter.voided_reason})
+    messages.success(request, f"Ballot {voter.pk} is {'out of' if voter.voided_at else 'back in'} the tallies.")
+    return redirect("voting-manage", slug=event.slug)

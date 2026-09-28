@@ -4,7 +4,8 @@
 <h1>Possible duplicates</h1>
 {% include "portal/organizer/_nav.html" %}
 <p>A project is flagged when it has the same repository and title as an earlier one, or the same team resubmitted the same repository or title.
-  Flagged projects stay out of the rankings until you decide. Their reviews are kept either way.</p>
+  Only submitted projects count; the one submitted later is the copy. Flagged projects stay out of the rankings until you decide,
+  and a project you call different is never flagged again. Their reviews are kept either way.</p>
 {% for p in flagged %}
 <section class="sheet">
   <h2><a href="{% url 'project' p.pk %}">{{ p.title }}</a> by {{ p.team.name }}</h2>

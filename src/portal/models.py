@@ -205,6 +205,9 @@ class Project(models.Model):
     # Set when a submission repeats another one; it stays out of the rankings
     # until an organizer decides.
     duplicate_of = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="duplicates")
+    # An organizer said it isn't a duplicate; the detector leaves it alone
+    # from then on, so the next submission can't flag it again.
+    duplicate_cleared = models.BooleanField(default=False)
     external_id = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

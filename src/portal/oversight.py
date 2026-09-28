@@ -40,12 +40,13 @@ def duplicates(request, event):
 @require_POST
 def resolve_duplicate(request, event, pk):
     """Either confirm the flag (the copy stays out of the rankings) or clear
-    it (it was a different project after all and goes back in)."""
+    it (it was a different project after all and goes back in, for good:
+    duplicate_cleared keeps the detector from flagging it again)."""
     project = get_object_or_404(Project, event=event, pk=pk, duplicate_of__isnull=False)
     if request.POST.get("decision") == "distinct":
         before = {"duplicate_of": project.duplicate_of_id}
-        project.duplicate_of = None
-        project.save(update_fields=["duplicate_of", "updated_at"])
+        project.duplicate_of, project.duplicate_cleared = None, True
+        project.save(update_fields=["duplicate_of", "duplicate_cleared", "updated_at"])
         audit.record("project.not_duplicate", request=request, event=event, obj=project, before=before)
         messages.success(request, f"{project.title} is back in the rankings. Hand it out for review if it needs more.")
     else:

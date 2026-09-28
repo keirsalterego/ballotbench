@@ -15,7 +15,7 @@ from rest_framework.exceptions import APIException
 
 from . import audit
 from .access import db_now, guarded, submissions_closed_reason
-from .duplicates import find_duplicates
+from .duplicates import flag_on_submit
 from .models import Event, Membership, Project, Team, TeamInvite, TeamMember
 
 INVITE_LIFETIME = timedelta(hours=72)
@@ -216,12 +216,7 @@ def project_form(request, slug, pk=None):
             audit.record(action, request=request, event=event, obj=project, before=before,
                          after=audit.snapshot(project, PROJECT_FIELDS))
             if submit:
-                for dup, original in find_duplicates(event):
-                    if dup.duplicate_of_id is None:
-                        dup.duplicate_of = original
-                        dup.save(update_fields=["duplicate_of", "updated_at"])
-                        audit.record("project.flag_duplicate", request=request, event=event, obj=dup,
-                                     after={"duplicate_of": original.pk})
+                flag_on_submit(request, event, project)
             messages.success(request, "Submitted." if submit else "Saved as a draft.")
             return redirect("event-me", slug=slug)
     return render(request, "portal/participant/project_form.html", {

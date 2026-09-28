@@ -1,0 +1,46 @@
+{% extends "portal/base.html" %}
+{% block title %}Judging progress{% endblock %}
+{% block content %}
+<h1>Judging progress</h1>
+{% include "portal/organizer/_nav.html" %}
+<p class="lede">{{ done }} of {{ total }} reviews in ({{ pct }}%).
+  {% if low %}{{ low|length }} project{{ low|length|pluralize }} {{ low|length|pluralize:"has,have" }} fewer than {{ event.reviews_per_project }} finished reviews.{% endif %}
+  {% if unfilled %}<a href="{% url 'assign' event.slug %}">Hand out {{ unfilled }} more</a>.{% endif %}</p>
+
+<h2>Judges</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Judge</th><th class="num">Assigned</th><th class="num">Done</th><th class="num">Started</th><th class="num">Not started</th><th class="num">Stepped aside</th><th>Done</th></tr></thead>
+  <tbody>{% for r in judges %}
+  <tr>
+    <td>{{ r.judge__name|default:r.judge__email }}</td>
+    <td class="num">{{ r.assigned }}</td><td class="num">{{ r.done }}</td><td class="num">{{ r.started }}</td>
+    <td class="num">{{ r.not_started }}</td><td class="num">{{ r.recused|default:"" }}</td>
+    <td><span class="bar" style="width: {{ r.pct }}px" aria-hidden="true"></span> {{ r.pct }}%</td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Projects, fewest finished reviews first</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Project</th><th>Track</th><th class="num">Finished</th><th class="num">Waiting</th><th></th></tr></thead>
+  <tbody>{% for r in projects %}
+  <tr>
+    <td><a href="{% url 'project' r.project.pk %}">{{ r.project.title }}</a></td>
+    <td>{{ r.project.track.name|default:"" }}</td>
+    <td class="num">{{ r.done }}</td><td class="num">{{ r.pending }}</td>
+    <td>{% if r.low %}<span class="flag">low coverage{% if r.missing %}, {{ r.missing }} not handed out{% endif %}</span>{% endif %}</td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Change by hand</h2>
+<form method="post" action="{% url 'assign-manual' event.slug %}" class="filters">{% csrf_token %}
+  <select name="judge" aria-label="Judge">{% for m in manual_judges %}<option value="{{ m.user_id }}">{{ m.user.email }}</option>{% endfor %}</select>
+  <select name="project" aria-label="Project">{% for p in manual_projects %}<option value="{{ p.pk }}">{{ p.title }}</option>{% endfor %}</select>
+  <button class="quiet">Give this project to this judge</button>
+</form>
+{% if pending_assignments %}
+<details><summary>{{ pending_assignments|length }} review{{ pending_assignments|length|pluralize }} waiting on a judge</summary>
+<ul>{% for a in pending_assignments %}<li>{{ a.project.title }}, with {{ a.judge.email }}
+  <form method="post" action="{% url 'unassign' event.slug a.pk %}" class="inline">{% csrf_token %}<button class="link">take back</button></form></li>{% endfor %}</ul>
+</details>
+{% endif %}
+{% endblock %}

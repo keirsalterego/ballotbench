@@ -133,8 +133,13 @@ def add_track(request, event):
 @require_POST
 def delete_track(request, event, pk):
     track = get_object_or_404(event.tracks, pk=pk)
+    try:
+        with guarded():
+            track.delete()          # unsets projects' track: after the deadline the trigger refuses that
+    except APIException:
+        messages.error(request, f"{track.name} has projects and submissions are closed, so it can't be deleted now.")
+        return redirect("manage", slug=event.slug)
     audit.record("track.delete", request=request, event=event, obj=track, before={"name": track.name})
-    track.delete()
     return redirect("manage", slug=event.slug)
 
 

@@ -130,3 +130,21 @@ def test_pages_accept_tokens_with_the_same_role_checks(api):
     assert api("organizer").get(f"/events/{EVENT}/manage").status_code == 200
     from django.test import Client
     assert Client(HTTP_AUTHORIZATION="Bearer nope").get("/projects").status_code == 401
+
+
+def test_organizer_naming_a_judge_is_scoped_to_their_events(api, web):
+    from portal.models import Event, Membership
+    other = Event.objects.create(slug="elsewhere", name="Elsewhere", submissions_open="2026-01-01T00:00:00Z",
+                                 submissions_close="2026-01-02T00:00:00Z")
+    stranger = User.objects.create_user("stranger@x.org", "pw-for-tests-only")
+    Membership.objects.create(user=stranger, event=other, role="judge", external_id="jdg_24")
+    rows = api("organizer").get("/api/judge/scores?judge=jdg_24").json()
+    assert {r["judge"] for r in rows} == {"diego.herrera@example.org"}
+
+
+def test_reserved_event_slugs_are_refused(web):
+    response = web("organizer").post("/events/new", {"name": "x", "slug": "import", "reviews_per_project": 3,
+                                                     "max_team_size": 4, "submissions_open": "2026-10-01T00:00",
+                                                     "submissions_close": "2026-10-02T00:00", "voting_mode": "off",
+                                                     "vote_credits": 25})
+    assert response.status_code == 200 and "used by the portal" in response.content.decode()

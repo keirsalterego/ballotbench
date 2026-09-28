@@ -26,13 +26,16 @@ and what doesn't stop it.
   (`voting.normalize_email`: lowercase, `+tag` dropped, Gmail dots and
   `googlemail.com` folded), so `a.b+1@googlemail.com` is `ab@gmail.com`. A
   second spelling of an inbox gets no second ballot and is logged as
-  `vote.duplicate_refused`. Sign-ups are rate limited per address (10 an
+  `vote.duplicate_refused`; its link goes to the spelling just typed, and
+  replaces the last one, so whoever typed `alice+x@` first doesn't get
+  `alice@`'s links. An address with a quoted local part (`"a.b"@gmail.com`)
+  is refused rather than normalized. Sign-ups are rate limited per address (10 an
   hour), link requests per address (5 an hour) and per inbox (3 an hour).
   The organizer's abuse panel (`voting.abuse_report`) flags networks (/24,
   or /64 for IPv6) with three or more voters, accounts created less than an
   hour before their first ballot, and three or more identical ballots.
-  Organizers void a ballot with a reason; it leaves the tallies and the
-  audit log says who did it and why.
+  Organizers void a ballot with a reason; it leaves the tallies for good and
+  the audit log says who did it and why.
 - **Doesn't stop it:** someone with many real inboxes, a catch-all domain,
   or a botnet of addresses. There is no CAPTCHA, phone check or proof of
   personhood. Flags are never acted on automatically, because an office or
@@ -63,8 +66,30 @@ and what doesn't stop it.
   while voting is open, and published results are hidden again if voting
   reopens (`results.visible_run`), so nobody votes with the judges' ranking
   in front of them. Unpublished results are a 404, not a 403.
-- **Doesn't stop it:** an organizer telling people. Organizers see tallies
-  live, by design, so they can spot abuse.
+  While voting is open organizers see how many ballots there are and what
+  each voter spent, not the tallies, and a void can't be undone: with live
+  tallies and an undo, voiding one ballot, reading the tallies and counting
+  it again would show what that voter chose.
+- **Doesn't stop it:** an organizer telling people once voting closes.
+  An organizer who voids a ballot after the close can see from the tallies
+  what it held, at the price of throwing it away; one who moves the close
+  date to read the tallies and then reopens voting can compare two reads.
+  Both leave dated rows in the audit log.
+
+### Pushing a rival out as a duplicate
+
+- **Stops it:** a flagged duplicate leaves judging and the ballot, so the
+  detector (`duplicates.find_duplicates`) only compares submitted projects
+  and calls the one submitted later the copy, by `submitted_at`, which only
+  the server sets. A submit only ever flags the project being submitted
+  (`duplicates.flag_on_submit`), so copying another team's public title and
+  repo into an old draft flags the copy, not the original. An organizer's
+  "it's a different project" sets `duplicate_cleared`, and the detector
+  never flags that project again.
+- **Doesn't stop it:** a team that submits a placeholder early and edits it
+  into a copy afterwards looks earlier to a whole-event scan. Submits never
+  run one; only an organizer's import does, and its flags are on the
+  duplicates page for a person to judge.
 
 ### Scraping drafts
 

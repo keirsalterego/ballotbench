@@ -64,8 +64,9 @@ The spec said a second sign-up with another spelling of the same inbox
 inbox has already voted" would let anyone check whether a given address
 voted. Instead the page reads the same either way, no second ballot is made,
 the attempt is logged as `vote.duplicate_refused` for the abuse panel, and
-a fresh link goes to the address that signed up first, which is the same
-inbox. The person who owns it can still get in; nobody else learns anything.
+a fresh link goes to the address just typed. (At first it went to the
+address that signed up first; see the end of these notes for why not.) The
+person who owns the inbox can still get in; nobody else learns anything.
 
 ## Hiding results while the vote is open
 
@@ -133,3 +134,32 @@ made the health check fail on its own redirect, and that an organizer's
 only unique per event. All fixed, each with a test. The lesson I keep
 relearning: the fastest code review is trying to explain the code to a
 stranger.
+
+## What a security review found in the vote and the duplicates
+
+**Void, read, unvoid.** Organizers saw the tallies live and could undo a
+void, so voiding one ballot, reading the tallies and counting it again
+showed exactly what that voter chose, while every page said ballots were
+private. A void is now final, and while voting is open the organizer page
+shows how many ballots there are, not the tallies. After the close the
+tallies are there, and a void still subtracts a ballot you can see; but it
+is gone for good, so reading it costs the organizer that vote.
+
+**The first spelling of an inbox owned its links.** Asking for a link as
+`alice+nope@yahoo.com` sent every later link for `alice@yahoo.com` to the
+`+nope` address. For providers where a +tag is its own inbox, that's a
+stolen ballot. The link now goes to whatever was typed; a new link replaces
+the old one. Quoted local parts (`"a.b"@gmail.com`) are refused: legal, but
+nobody needs one to vote, and normalizing them right is a rabbit hole.
+`normalize_email` also used to raise on `+x@example.com`, and because it runs
+over every team member's address, one such account broke every email
+voter's ballot page. It no longer raises.
+
+**Duplicates by pk.** The detector ordered projects by pk, drafts included,
+and every submit re-flagged the whole event. A draft made early and filled
+in later with another team's public title and repo made the real project
+the "duplicate", taking it out of judging and off the ballot; and an
+organizer's "it's different" lasted until the next submit. Now only
+submitted projects count, earlier means `submitted_at`, a submit only flags
+the project being submitted, and `duplicate_cleared` keeps an organizer's
+call.

@@ -102,10 +102,10 @@ on: signed-in accounts, or anyone who confirms an email address by a link
 once). Ballots are quadratic: n votes for a project cost n² of a fixed
 budget. Each voter sees the projects in their own random order and can't
 vote for their own team, and nobody sees a tally until voting has closed and
-the organizer publishes. Organizers see the tallies as they come in, next to
-an abuse panel that flags networks with many voters, brand-new accounts and
-identical ballots, and they can void a ballot with a reason. Nothing is
-voided automatically.
+the organizer publishes. While voting is open organizers see how many
+ballots are in, not the tallies, next to an abuse panel that flags networks
+with many voters, brand-new accounts and identical ballots, and they can
+void a ballot with a reason, for good. Nothing is voided automatically.
 
 **Anyone signed in** comments on submitted projects; the event's organizers
 can hide a comment, and it disappears for everyone else.

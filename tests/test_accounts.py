@@ -117,3 +117,50 @@ def test_password_reset_page_reads_the_same_for_unknown_addresses(web):
     response = web().post("/password-reset", {"email": "nobody-here@example.org"})
     assert response.status_code == 302 and response.url == "/password-reset/sent"
     assert len(mail.outbox) == before
+
+
+def open_demo_vote():
+    from datetime import timedelta
+    from django.utils import timezone
+    from portal.models import Event
+    now = timezone.now()
+    Event.objects.filter(slug="demo-open").update(voting_mode="account", voting_open=now - timedelta(hours=1),
+                                                  voting_close=now + timedelta(days=1))
+
+
+def test_an_unconfirmed_account_cannot_vote_until_it_confirms(web):
+    import re
+    from django.core import mail
+    open_demo_vote()
+    client = web()
+    signup(client, "fresh-voter@example.org")
+    assert client.get("/events/demo-open/vote").status_code == 403
+    assert client.get("/api/events/demo-open/ballot").status_code == 403
+    link = re.search(r"/confirm-email/\S+", mail.outbox[-1].body).group(0)
+    assert client.get(link).status_code == 200                                   # a scanner opening it changes nothing
+    assert User.objects.get(email="fresh-voter@example.org").email_confirmed_at is None
+    assert client.post(link).status_code == 302
+    assert User.objects.get(email="fresh-voter@example.org").email_confirmed_at is not None
+    assert client.get("/events/demo-open/vote").status_code == 200
+    assert AuditLog.objects.filter(action="user.email_confirmed").exists()
+
+
+def test_a_confirmation_link_is_bound_to_the_address(web):
+    from portal.views import confirmation_token
+    user = User.objects.create_user("moved@example.org", "long enough password")
+    token = confirmation_token(user)
+    User.objects.filter(pk=user.pk).update(email="elsewhere@example.org")
+    assert web().post(f"/confirm-email/{token}").status_code == 404
+    assert web().get("/confirm-email/forged-token").status_code == 404
+
+
+def test_a_password_reset_confirms_the_address(web):
+    import re
+    from django.core import mail
+    user = User.objects.create_user("resetter@example.org", "long enough password")
+    web().post("/password-reset", {"email": user.email})
+    link = re.search(r"/password-reset/[\w-]+/[\w-]+", mail.outbox[-1].body).group(0)
+    client = web()
+    form_url = client.get(link, follow=True).redirect_chain[-1][0]
+    client.post(form_url, {"new_password1": "another good passphrase", "new_password2": "another good passphrase"})
+    assert User.objects.get(pk=user.pk).email_confirmed_at is not None

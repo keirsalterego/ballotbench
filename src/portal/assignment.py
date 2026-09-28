@@ -3,16 +3,16 @@ without a database, plus the thin layer that reads and writes the models.
 
 The plan tops every project up to k reviews:
 
-1. Work in rounds. In each round every project still short of k gets one more
-   judge, fewest reviews first, so a shortage is spread evenly rather than
-   landing on whichever project happened to come last.
-2. The judge is the least-loaded eligible one. Eligible means: not on the
-   project's team, the project's track is one of theirs (or they have none),
-   and they don't already hold that project (a recusal counts: we don't
+1. The least-loaded judge who can still help picks next, so loads stay
+   within one review of each other where eligibility allows.
+2. They take the neediest project they are eligible for: fewest reviews so
+   far, then fewest judges left who could take it, so a shortage is spread
+   evenly and scarce judges go where only they can help. Eligible means: not
+   on the project's team, the project's track is one of theirs (or they
+   have none), and they don't already hold it (a recusal counts: we don't
    hand a project back to a judge who stepped aside from it).
-3. On a tie in load, prefer a judge who joins two parts of the judge-project
-   graph that aren't yet connected, then the lowest id, so plans are
-   deterministic.
+3. On a tie, prefer a project that joins two parts of the judge-project
+   graph not yet connected, then the lowest id, so plans are deterministic.
 4. Afterwards, if the graph is still in pieces, add one bridging review per
    extra piece. Calibration compares judges through the projects they share;
    two groups with no judge in common can't be put on one scale.
@@ -103,39 +103,84 @@ def plan(projects, judges, existing, k):
         if bridge:
             result.bridges.append((judge.id, project.id))
 
-    progress = True
-    while progress:
-        progress = False
-        for project in sorted(projects, key=lambda p: (have[p.id], p.id)):
-            if have[project.id] >= k:
-                continue
-            candidates = [j for j in judges if (j.id, project.id) not in taken and eligible(j, project)]
-            if not candidates:
-                continue
-            pnode = uf.find(("p", project.id))
-            best = min(candidates, key=lambda j: (load[j.id], uf.find(("j", j.id)) == pnode, j.id))
-            add(best, project)
-            progress = True
+    def candidates(project):
+        return [j for j in judges if (j.id, project.id) not in taken and eligible(j, project)]
 
-    # Bridge whatever is still in pieces: join each smaller piece to the
-    # largest with the least-loaded eligible pair across the gap.
+    # Judge-driven: the least-loaded judge who can still help takes the
+    # neediest project they're eligible for. Driving by judge keeps loads
+    # within one of each other; choosing the neediest project (fewest
+    # reviews, then fewest judges left who could take it) keeps coverage even.
+    while True:
+        needy = [p for p in projects if have[p.id] < k]
+        if not needy:
+            break
+        for judge in sorted(judges, key=lambda j: (load[j.id], j.id)):
+            options = [p for p in needy if (judge.id, p.id) not in taken and eligible(judge, p)]
+            if options:
+                jnode = uf.find(("j", judge.id))
+                project = min(options, key=lambda p: (have[p.id], len(candidates(p)),
+                                                      uf.find(("p", p.id)) == jnode, p.id))
+                add(judge, project)
+                break
+        else:
+            break
+
+    # Greedy can paint itself into a corner: the idle judges already hold the
+    # last projects that need someone. Repair by moving one of this plan's new
+    # reviews from the busiest judge to the idlest judge who may take it,
+    # until no such move narrows the gap. Existing reviews are never moved.
+    by_id = {j.id: j for j in judges}
+    by_pid = {p.id: p for p in projects}
+    while True:
+        order = sorted(load, key=lambda j: (load[j], j))
+        moved = False
+        for low in order:
+            for high in reversed(order):
+                if load[high] - load[low] <= 1:
+                    break
+                for index, (j, pid) in enumerate(result.new):
+                    if j == high and (low, pid) not in taken and eligible(by_id[low], by_pid[pid]):
+                        taken.discard((high, pid))
+                        taken.add((low, pid))
+                        result.new[index] = (low, pid)
+                        load[high] -= 1
+                        load[low] += 1
+                        moved = True
+                        break
+                if moved:
+                    break
+            if moved:
+                break
+        if not moved:
+            break
+    uf = UnionFind()
+    for j, p in active + result.new:
+        uf.union(("j", j), ("p", p))
+
+    # Bridge whatever is still in pieces with the least-loaded eligible pair
+    # that joins two of them. A judge with no reviews yet can bridge too, in
+    # two steps: first into one piece, then across to another. Each pass adds
+    # one new pair, so this ends.
     while True:
         edges = [(j, p) for j, p in active] + result.new
         uf2, count = components(edges, projects, judges)
         if count <= 1:
             break
-        sizes = {}
-        for node in uf2.parent:
-            root = uf2.find(node)
-            sizes[root] = sizes.get(root, 0) + 1
-        main = max(sizes, key=lambda r: (sizes[r], str(r)))
-        crossing = [(load[j.id], j.id, p.id, j, p) for j in judges for p in projects
-                    if (j.id, p.id) not in taken and eligible(j, p)
-                    and ("j", j.id) in uf2.parent and ("p", p.id) in uf2.parent
-                    and (uf2.find(("j", j.id)) == main) != (uf2.find(("p", p.id)) == main)]
-        if not crossing:
+        joining, entering = [], []
+        for j in judges:
+            jin = ("j", j.id) in uf2.parent
+            for p in projects:
+                if (j.id, p.id) in taken or not eligible(j, p) or ("p", p.id) not in uf2.parent:
+                    continue
+                if jin and uf2.find(("j", j.id)) != uf2.find(("p", p.id)):
+                    joining.append((load[j.id], j.id, p.id, j, p))
+                elif not jin and any(eligible(j, q) and (j.id, q.id) not in taken and ("p", q.id) in uf2.parent
+                                     and uf2.find(("p", q.id)) != uf2.find(("p", p.id)) for q in projects):
+                    entering.append((load[j.id], j.id, p.id, j, p))
+        options = joining or entering
+        if not options:
             break
-        _, _, _, j, p = min(crossing)
+        _, _, _, j, p = min(options)
         add(j, p, bridge=True)
 
     _, result.components_after = components([(j, p) for j, p in active] + result.new, projects, judges)

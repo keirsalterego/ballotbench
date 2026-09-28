@@ -146,3 +146,31 @@ def test_bootstrap_intervals_are_wide_on_noise_and_narrow_on_signal():
     signal = bootstrap(obs, resamples=60)
     width = lambda b: sorted(h - l for l, h, _ in b.values())[len(b) // 2]
     assert width(noise) > 2 * width(signal)
+
+
+def test_kingmaker_check_finds_a_credible_judge_who_lifts_one_project():
+    from portal.calibration import kingmakers
+    obs, truth = synthetic(5)
+    base = fit(obs)
+    q = {p: f.quality for p, f in base.projects.items()}
+    order = sorted(q, key=lambda p: -q[p])
+    lifted = order[4]                                    # just off the podium
+    # Judge 99 agrees with everyone on six projects, and loves the fifth-placed one.
+    planted = obs + [(99, p, 0.5 + 0.12 * q[p]) for p in order[:4] + order[6:8]] + [(99, lifted, 0.98)]
+    found = {j: left for j, _, left in kingmakers(planted)}
+    assert 99 in found and lifted in found[99]      # without judge 99, the lifted project drops off the podium
+
+
+def test_a_lone_contrarian_is_neutralized_not_a_kingmaker():
+    from portal.calibration import kingmakers
+    obs, truth = synthetic(5)
+    planted = obs + [(99, truth[-1], 0.99), (99, truth[0], 0.2), (99, truth[1], 0.2)]
+    assert fit(planted).judges[99].flag == "discordant"
+    assert 99 not in {j for j, _, _ in kingmakers(planted)}
+
+
+def test_silent_judges_are_never_kingmakers():
+    from portal.calibration import kingmakers
+    obs, truth = synthetic(5)
+    constant = obs + [("flat", p, 0.5) for p in truth[:5]]
+    assert "flat" not in {j for j, _, _ in kingmakers(constant)}

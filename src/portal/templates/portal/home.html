@@ -10,11 +10,23 @@
     <td>{{ m.event.name }}</td>
     <td>{{ m.role }}</td>
     <td>{{ m.event.submissions_close|date:"j M Y H:i" }} UTC</td>
-    <td>{% block actions %}{% endblock %}</td>
+    <td>
+      {% if m.role == "participant" %}<a href="{% url 'event-me' m.event.slug %}">Team and project</a>{% endif %}
+    </td>
   </tr>
   {% endfor %}
 </table></div>
 {% else %}
 <p class="muted">You aren't in any event yet.</p>
+{% endif %}
+
+{% if joinable %}
+<h2>Take part</h2>
+<ul>
+{% for e in joinable %}
+  <li>{{ e.name }} <span class="muted">closes {{ e.submissions_close|date:"j M Y H:i" }} UTC</span>
+    <form method="post" action="{% url 'event-join' e.slug %}" style="display:inline">{% csrf_token %}<button class="link">join as a participant</button></form></li>
+{% endfor %}
+</ul>
 {% endif %}
 {% endblock %}

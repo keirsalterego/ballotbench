@@ -110,3 +110,26 @@ same sequence and every q matches to the last bit. The test asserts equality.
 `document.documentElement.scrollHeight` is never less than the iframe's own
 height. The embed reports the height of its content box instead; I checked
 it in headless Chromium on a page that embeds the widget.
+
+## Three branches at once, and what the docs caught
+
+I split the last stretch into three branches built side by side: the book,
+the public vote, and the T4 pieces. Two things I didn't expect:
+
+**Both code branches took migration 0013.** Each was right on its own branch
+and together they gave Django two leaf nodes. The webhooks migration became
+0014 and depends on the voting one; nothing outside a scratch database had
+applied either, so renaming was safe. Next time I'd reserve numbers up front.
+
+**Writing the docs found real bugs.** Explaining the calibration page line by
+line turned up that the page and `normalization_proof` disagreed: the page
+leaves out a project whose every reviewer the model ignores (`prj_24`, both
+of whose judges are discordant), the proof didn't, so JUDGING.md quoted a
+ranking the product never shows. They also ran the agreement test with
+different shuffle counts. Documenting the operations side found that
+`BALLOTBENCH_DEMO_SEED=0` still loaded the fixture event, that `DJANGO_SECURE`
+made the health check fail on its own redirect, and that an organizer's
+`?judge=jdg_24` could match a judge in another event, since fixture ids are
+only unique per event. All fixed, each with a test. The lesson I keep
+relearning: the fastest code review is trying to explain the code to a
+stranger.

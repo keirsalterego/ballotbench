@@ -40,6 +40,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                   "demo_url", "tags", "status", "submitted_at", "duplicate_of", "submit"]
         read_only_fields = ["status", "submitted_at", "duplicate_of"]
 
+    def validate_tags(self, tags):
+        tags = list(dict.fromkeys(t.strip().lower() for t in tags if t.strip()))
+        if len(tags) > 10:
+            raise serializers.ValidationError("at most 10 tags")
+        return tags
+
     def validate_track(self, track):
         event = self.context["event"]
         if track is not None and track.event_id != event.pk:

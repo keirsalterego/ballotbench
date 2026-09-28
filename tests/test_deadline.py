@@ -92,3 +92,15 @@ def test_submit_in_open_event_is_audited(api):
                                        content_type="application/json")
     assert response.status_code == 201 and response.json()["status"] == "submitted"
     assert AuditLog.objects.filter(action="project.submit", object_id=str(response.json()["id"])).exists()
+
+
+def test_api_caps_and_cleans_tags(api):
+    demo = Event.objects.get(slug="demo-open")
+    team = Team.objects.create(event=demo, name="Tag Team")
+    TeamMember.objects.create(team=team, event=demo, user=User.objects.get(email="priya1@example.org"))
+    url = "/api/events/demo-open/projects"
+    too_many = api("participant").post(url, {"title": "t", "tags": [f"t{i}" for i in range(11)]},
+                                       content_type="application/json")
+    assert too_many.status_code == 400
+    ok = api("participant").post(url, {"title": "t", "tags": ["AI", "ai ", "web"]}, content_type="application/json")
+    assert ok.json()["tags"] == ["ai", "web"]

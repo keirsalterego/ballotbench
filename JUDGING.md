@@ -154,7 +154,7 @@ independent draws: projects' means spread no more than shuffled scores do, and
 nine judges' scores run against the consensus. So the honest result on the
 fixture is: the constant and single-review judges are handled, the duplicate is
 out, the ranking is computed, and **almost every rank's interval is wide**
-(median 28 places). I'd rather show that than a crisp ranking that is noise.
+(median 27 places). I'd rather show that than a crisp ranking that is noise.
 
 ## 7. The fixture's traps
 
@@ -162,7 +162,7 @@ out, the ranking is computed, and **almost every rank's interval is wide**
 |-|-|-|
 | `jdg_07` scores 4 on everything | flagged `constant`, weight exactly 0 | calibration page, `judges.csv`, the proof |
 | `jdg_01` (and `jdg_23`) have one review | flagged `single_review`, weight 0 | same |
-| two unfinished batches: 8 projects with 2 reviews | shrunk towards the middle, wider intervals, "low coverage" flag, 8 top-ups proposed | progress dashboard, assignment preview |
+| two unfinished batches: 8 projects with 2 reviews | shrunk towards the middle, wider intervals, "low coverage" flag, 8 top-ups proposed. One of them, `prj_24`, was reviewed only by two judges the model ignores (both discordant), so it has nothing to be ranked by and is listed as left out until its top-up reviews arrive | progress dashboard, assignment preview, calibration page |
 | `prj_41` repeats `prj_07` (same team, title, repo) | detected at import, `duplicate_of` set, out of the rankings until an organizer decides; its reviews still calibrate its judges | duplicates page, gallery badge, audit log |
 | judge load 1 to 11 | noise shrinkage trusts busy judges more; new work goes to the idlest | judge table |
 
@@ -191,59 +191,70 @@ Agreement: variance of project means 0.0080, 0.0089 on average when every score 
   The judges agree on which projects are better no more than chance would. Calibration takes out
   judge habits; it can't create a signal the scores don't hold, so most rank moves below are noise.
 Left out of the ranking: prj_41 (Dry Harbour) repeats prj_07; its 4 reviews still count towards calibrating their judges.
+Left out of the ranking: prj_24 (Glass Beacon): all 2 of its reviewers carry no weight, so there's nothing to rank it by.
 rank  could be  raw  move  project  title             n raw mean calibrated
-   1      1-40   32   +31  prj_07   Dry Harbour       5    0.583      0.832
-   2      1-34    5    +3  prj_37   Salt Loom         4    0.771      0.804
-   3      2-37   23   +20  prj_01   Glass Signal      3    0.611      0.774
-   4      2-38    9    +5  prj_08   North Drift       5    0.700      0.762
+   1      1-39   31   +30  prj_07   Dry Harbour       5    0.583      0.832
+   2      1-33    5    +3  prj_37   Salt Loom         4    0.771      0.804
+   3      2-36   22   +19  prj_01   Glass Signal      3    0.611      0.774
+   4      2-37    9    +5  prj_08   North Drift       5    0.700      0.762
    5      1-16    1    -4  prj_11   Salt Ledger       4    0.833      0.749
    6      2-12    2    -4  prj_34   Iron Switch       3    0.833      0.746
-   7      3-37   15    +8  prj_09   Hollow Signal     3    0.639      0.741
-   8      4-37   26   +18  prj_12   Open Beacon       3    0.611      0.739
-   9      4-40   27   +18  prj_27   Flat Thread       3    0.611      0.732
-  10      2-30    4    -6  prj_25   Dry Relay         3    0.778      0.716
+   7      3-36   15    +8  prj_09   Hollow Signal     3    0.639      0.741
+   8      4-36   25   +17  prj_12   Open Beacon       3    0.611      0.739
+   9      4-39   26   +17  prj_27   Flat Thread       3    0.611      0.732
+  10      2-29    4    -6  prj_25   Dry Relay         3    0.778      0.716
   11      3-16    7    -4  prj_33   Slow Trail        3    0.750      0.709
-  12      4-32    8    -4  prj_21   Copper Kiln       3    0.722      0.708
-  13      6-35   18    +5  prj_02   Small Meadow      3    0.639      0.686
+  12      4-31    8    -4  prj_21   Copper Kiln       3    0.722      0.708
+  13      6-34   18    +5  prj_02   Small Meadow      3    0.639      0.686
   14      8-28   17    +3  prj_31   Salt Ferry        3    0.639      0.684
-  15      3-36   10    -5  prj_04   Green Switch      3    0.694      0.675
+  15      3-35   10    -5  prj_04   Green Switch      3    0.694      0.675
   16      5-20    3   -13  prj_10   Still Beacon      2    0.792      0.666
-  17      3-39   22    +5  prj_35   Warm Beacon       5    0.617      0.652
-  18      3-37   31   +13  prj_29   Flat Relay        2    0.583      0.651
-  19      5-33   12    -7  prj_15   Copper Orbit      2    0.667      0.651
-  20     12-32   20        prj_24   Glass Beacon      2    0.625      0.639
-  21     11-38   29    +8  prj_03   Deep Compass      3    0.583      0.634
-  22      1-30    6   -16  prj_16   Salt Kiln         3    0.750      0.624
-  23     11-30   14    -9  prj_36   Salt Drift        3    0.667      0.615
-  24     18-30   13   -11  prj_19   Small Relay       2    0.667      0.589
-  25      4-28   16    -9  prj_17   Small Loom        3    0.639      0.589
-  26     12-34   28    +2  prj_14   Green Lantern     5    0.600      0.582
-  27      5-37   19    -8  prj_18   Open Kiln         2    0.625      0.580
-  28     22-38   24    -4  prj_28   Flat Meadow       3    0.611      0.579
-  29      1-34   21    -8  prj_39   Paper Anchor      2    0.625      0.571
-  30      2-36   11   -19  prj_38   Deep Beacon       3    0.694      0.567
-  31     21-38   38    +7  prj_40   Slow Loom         2    0.500      0.564
-  32      4-39   37    +5  prj_30   Paper Harbour     3    0.528      0.559
-  33     19-38   35    +2  prj_06   Dry Compass       3    0.528      0.558
-  34     17-40   36    +2  prj_22   Dry Bridge        3    0.528      0.556
-  35      4-39   34    -1  prj_26   Amber Hours       3    0.556      0.544
-  36      5-39   25   -11  prj_32   Loud Ledger       3    0.611      0.529
-  37     12-40   30    -7  prj_13   Quiet Anchor      3    0.583      0.515
-  38     14-40   33    -5  prj_20   Paper Thread      3    0.556      0.504
-  39     29-40   39        prj_05   North Compass     3    0.472      0.500
-  40     25-40   40        prj_23   Slow Quarry       3    0.472      0.490
+  17      3-38   21    +4  prj_35   Warm Beacon       5    0.617      0.652
+  18      3-36   30   +12  prj_29   Flat Relay        2    0.583      0.651
+  19      5-32   12    -7  prj_15   Copper Orbit      2    0.667      0.651
+  20     11-37   28    +8  prj_03   Deep Compass      3    0.583      0.634
+  21      1-29    6   -15  prj_16   Salt Kiln         3    0.750      0.624
+  22     11-29   14    -8  prj_36   Salt Drift        3    0.667      0.615
+  23     18-29   13   -10  prj_19   Small Relay       2    0.667      0.589
+  24      4-27   16    -8  prj_17   Small Loom        3    0.639      0.589
+  25     12-33   27    +2  prj_14   Green Lantern     5    0.600      0.582
+  26      5-36   19    -7  prj_18   Open Kiln         2    0.625      0.580
+  27     21-37   23    -4  prj_28   Flat Meadow       3    0.611      0.579
+  28      1-33   20    -8  prj_39   Paper Anchor      2    0.625      0.571
+  29      2-35   11   -18  prj_38   Deep Beacon       3    0.694      0.567
+  30     21-37   37    +7  prj_40   Slow Loom         2    0.500      0.564
+  31      4-38   36    +5  prj_30   Paper Harbour     3    0.528      0.559
+  32     18-37   34    +2  prj_06   Dry Compass       3    0.528      0.558
+  33     17-39   35    +2  prj_22   Dry Bridge        3    0.528      0.556
+  34      4-38   33    -1  prj_26   Amber Hours       3    0.556      0.544
+  35      5-38   24   -11  prj_32   Loud Ledger       3    0.611      0.529
+  36     12-39   29    -7  prj_13   Quiet Anchor      3    0.583      0.515
+  37     14-39   32    -5  prj_20   Paper Thread      3    0.556      0.504
+  38     28-39   38        prj_05   North Compass     3    0.472      0.500
+  39     24-39   39        prj_23   Slow Quarry       3    0.472      0.490
 
-37 of 40 projects change rank. Kendall's tau, calibrated vs raw: 0.454
-'could be' is a 90% bootstrap interval (each project's reviews resampled, 200 refits). Median width 28 places: on these scores most ranks are not distinguishable.
+37 of 39 projects change rank. Kendall's tau, calibrated vs raw: 0.457
+'could be' is a 90% bootstrap interval (each project's reviews resampled, 200 refits). Median width 27 places: on these scores most ranks are not distinguishable.
 Invariance checks on these scores (max |change in q| over all projects):
   PASS  jdg_24 adds 0.3 to every score: 1.1e-15, ranking identical
   PASS  jdg_24 doubles every score: 0.0e+00, ranking identical
   PASS  every judge gets a random shift and stretch: 3.1e-15, ranking identical
   PASS  constant judge(s) jdg_07 removed: 0.0e+00, ranking identical
 
+Kingmaker check: leaving out one judge at a time, 9 of 30 judges' absence would change who is in the top 3:
+  without jdg_11: prj_35 in, prj_01 out
+  without jdg_02: prj_16 in, prj_01 out
+  without jdg_20: prj_08 in, prj_01 out
+  without jdg_22: prj_08 in, prj_37 out
+  without jdg_26: prj_39 in, prj_07 out
+  without jdg_28: prj_08 in, prj_01 out
+  without jdg_03: prj_08 in, prj_01 out
+  without jdg_05: prj_08 in, prj_01 out
+  without jdg_06: prj_08 in, prj_01 out
+
 Second opinion: the rubric read as pairwise picks (Bradley-Terry, portal/pairwise.py):
   254 picks; no picks from jdg_01, jdg_07, jdg_23 (one review, or every pair tied)
-  Kendall's tau with the calibrated ranking 0.646, with raw means 0.628
+  Kendall's tau with the calibrated ranking 0.649, with raw means 0.630
   PASS  jdg_24's scores squared (not a shift or stretch): picks identical; the calibration's q moves by up to 0.04, since it only undoes linear habits
 
 Benchmark on synthetic events with a known true order (40 projects, 12 judges, 3 reviews each,
@@ -298,7 +309,7 @@ and checks each). A name on the list isn't an accusation; it says the podium
 rests on one person, which is where a second look, or one more review, is
 worth it.
 
-On the fixture, ten judges' absence would each swap one podium place,
+On the fixture, nine judges' absence would each swap one podium place,
 consistent with scores that carry no real signal.
 
 ## 11. Spending the next reviews where they matter

@@ -11,7 +11,7 @@ from collections import defaultdict
 from django.core.management.base import BaseCommand
 
 from portal import pairwise
-from portal.calibration import bootstrap, fit, signal_test
+from portal.calibration import bootstrap, fit, kingmakers, signal_test
 from portal.models import Event, Membership
 from portal.results import submitted_reviews
 from portal.scoring import weighted_score
@@ -152,6 +152,13 @@ class Command(BaseCommand):
             passed = diff < 1e-9 and same
             ok &= passed
             out(f"  {'PASS' if passed else 'FAIL'}  {label}: {diff:.1e}, ranking {'identical' if same else 'CHANGED'}")
+
+        decisive = kingmakers(obs, set(ranked), podium=3)
+        out(f"\nKingmaker check: leaving out one judge at a time, {len(decisive)} of {len(result.judges)} judges' "
+            f"absence would change who is in the top 3:")
+        for j, entered, left in decisive:
+            out(f"  without {names.get(j)}: {', '.join(titles[p][0] for p in entered)} in, "
+                f"{', '.join(titles[p][0] for p in left)} out")
 
         out("\nSecond opinion: the rubric read as pairwise picks (Bradley-Terry, portal/pairwise.py):")
         pairs = pairwise.picks(obs)

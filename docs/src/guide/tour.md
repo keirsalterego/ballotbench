@@ -50,7 +50,8 @@ next, nobody reviews their own team or outside their tracks. Apply it.
 
 Sign in as the judge. **Your reviews** lists only your projects and how long
 they'll take. Each has a scoresheet: one bubble per score per criterion, a
-comment only the organizers see, *Save draft* and *Submit review*. If you
+comment only the organizers see, *Save draft* and *Submit review* (after
+submitting, only *Resubmit*). If you
 know the team, **I have a conflict** steps you aside; the organizer sees the
 project needs another judge.
 

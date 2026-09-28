@@ -11,8 +11,10 @@ row of bubbles per criterion. Pick a number in each row. The weight of each
 criterion is shown next to its name.
 
 - **Save draft** keeps your scores without submitting them.
-- **Submit review** records them. You can change and resubmit until judging
-  closes.
+- **Submit review** records them. After that the sheet offers only
+  **Resubmit review**: you can change your scores and resubmit until judging
+  closes or the results are published, but a submitted review never goes
+  back to being a draft.
 - The comment goes to the organizers. Other judges never see it.
 
 ## What you can and can't see
@@ -24,7 +26,8 @@ answers "not found" for it, whatever URL you type or tool you use.
 ## Conflicts
 
 If you know the team, or have any other reason you shouldn't judge a project,
-open it and choose **I have a conflict**. You're taken off it, the organizers
+open it before you submit a review and choose **I have a conflict**, giving
+the reason. You're taken off it, the organizers
 see it needs another judge, and it's recorded in the audit log with your
 reason. You can't be assigned a project from a team you're on in the first
 place.

@@ -50,10 +50,11 @@ class BearerTokenAuthentication(authentication.BaseAuthentication):
 
 
 class BearerTokenMiddleware:
-    """Pages accept the same bearer tokens as the API, so a script (or the
-    isolation probe) sees the same role checks a browser does. It never
-    creates a session, and page POSTs still need a CSRF token: scripts that
-    write should use the API."""
+    """Pages accept the same bearer tokens as the API, for reading only, so a
+    script (or the isolation probe) sees the same role checks a browser does.
+    A token never changes anything through a page: page writes need a
+    signed-in session, so a leaked token can't mint new tokens at /me/tokens
+    or use the admin. Scripts that write use the API."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -68,5 +69,10 @@ class BearerTokenMiddleware:
                    .filter(token_hash=hash_token(token.strip()), revoked_at__isnull=True).first())
             if row is None or not row.user.is_active:
                 return HttpResponse("invalid or revoked token\n", status=401, content_type="text/plain")
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                return HttpResponse("a token can read pages but not change anything through them; use the API\n",
+                                    status=403, content_type="text/plain")
+            if request.path.startswith("/admin/") or request.path.startswith("/me/tokens"):
+                return HttpResponse("sign in to use this page\n", status=403, content_type="text/plain")
             request.user = row.user
         return self.get_response(request)

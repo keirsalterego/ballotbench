@@ -2,12 +2,14 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
-from . import api, apidocs, exports, judge, organizer, oversight, participant, progress, results, views, voting
+from . import api, apidocs, comments, exports, judge, organizer, oversight, participant, progress, results, views, voting
 
 urlpatterns = [
     path("", views.gallery),
     path("projects", views.gallery, name="gallery"),
     path("projects/<int:pk>", views.project_page, name="project"),
+    path("projects/<int:pk>/comments", comments.post_comment, name="comment-add"),
+    path("comments/<int:pk>/moderate", comments.moderate, name="comment-moderate"),
     path("login", views.login_page, name="login"),
     path("logout", auth_views.LogoutView.as_view(), name="logout"),
     path("signup", views.signup, name="signup"),
@@ -64,6 +66,7 @@ urlpatterns = [
     path("api/events/<slug:slug>/results", results.api_results, name="api-results"),
     path("api/events/<slug:slug>/ballot", voting.api_ballot, name="api-ballot"),
     path("api/projects/<int:pk>", api.project_detail, name="api-project"),
+    path("api/projects/<int:pk>/comments", comments.api_comments, name="api-comments"),
     path("api/judge/scores", api.judge_scores, name="api-judge-scores"),
     path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),
     path("api/judge/assignments/<int:pk>/review", judge.api_review, name="api-judge-review"),

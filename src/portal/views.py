@@ -9,7 +9,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from . import audit, ratelimit
-from .access import visible_projects
+from .access import is_organizer, visible_projects
+from .comments import visible_comments
 from .models import Event, Membership, Project, TeamMember, Track, User
 
 
@@ -43,7 +44,10 @@ def gallery(request):
 def project_page(request, pk):
     project = get_object_or_404(visible_projects(request.user).select_related("event", "team", "track"), pk=pk)
     members = project.team.members.select_related("user")
-    return render(request, "portal/project.html", {"project": project, "members": members})
+    return render(request, "portal/project.html", {
+        "project": project, "members": members, "comments": visible_comments(request.user, project),
+        "can_moderate": is_organizer(request.user, project.event),
+    })
 
 
 class SignupForm(forms.Form):

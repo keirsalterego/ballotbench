@@ -15,4 +15,28 @@
   {% if project.submitted_at %}<dt>Submitted</dt><dd>{{ project.submitted_at|date:"j F Y, H:i" }} UTC</dd>{% endif %}
 </dl>
 {% if project.tags %}<div class="tags">{% for t in project.tags %}<a href="{% url 'gallery' %}?tag={{ t|urlencode }}">#{{ t }}</a>{% endfor %}</div>{% endif %}
+{% if project.status == "submitted" and project.event.voting_mode != "off" %}<p><a href="{% url 'ballot' project.event.slug %}">Vote in the community vote</a> for {{ project.event.name }}.</p>{% endif %}
+
+<h2 id="comments">Comments</h2>
+{% if comments %}
+<ol class="docket" style="display:block">
+{% for c in comments %}
+  <li id="comment-{{ c.pk }}">
+    <p class="by">{{ c.author.name|default:"Someone" }}, {{ c.created_at|date:"j F Y, H:i" }} UTC{% if c.hidden_at %} <span class="flag">Hidden from everyone but the organizers</span>{% endif %}</p>
+    <div class="prose">{{ c.body|linebreaks }}</div>
+    {% if can_moderate %}<form method="post" action="{% url 'comment-moderate' c.pk %}" class="inline">{% csrf_token %}
+      {% if c.hidden_at %}<button name="action" value="unhide" class="link">Show it again</button>{% else %}<button name="action" value="hide" class="link">Hide this comment</button>{% endif %}</form>{% endif %}
+  </li>
+{% endfor %}
+</ol>
+{% else %}<p class="muted">No comments yet.</p>{% endif %}
+{% if project.status == "submitted" %}
+  {% if user.is_authenticated %}
+  <form method="post" action="{% url 'comment-add' project.pk %}" class="stack">{% csrf_token %}
+    <label>Add a comment <textarea name="body" rows="4" maxlength="2000" required></textarea>
+      <span class="muted">Plain text, up to 2000 characters. The team will read it, so be kind and specific.</span></label>
+    <div><button>Post comment</button></div>
+  </form>
+  {% else %}<p><a href="{% url 'login' %}?next={{ request.path|urlencode }}">Log in</a> to comment.</p>{% endif %}
+{% endif %}
 {% endblock %}

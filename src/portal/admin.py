@@ -51,6 +51,9 @@ class EventAdmin(AuditedAdmin):
 
 
 class ProjectForm(forms.ModelForm):
+    # A URL typed without a scheme means https, as it will by default in Django 6.
+    repo_url = forms.URLField(max_length=500, required=False, assume_scheme="https")
+    demo_url = forms.URLField(max_length=500, required=False, assume_scheme="https")
     class Meta:
         model = Project
         fields = "__all__"

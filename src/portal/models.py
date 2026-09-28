@@ -342,3 +342,23 @@ class AuditLog(models.Model):
     class Meta:
         ordering = ["-seq"]
         indexes = [models.Index(fields=["event", "action"])]
+
+
+class RoleInvite(models.Model):
+    """A single-use link that makes whoever opens it a judge or organizer of
+    one event. Organizers hand it out; only its hash is stored."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="role_invites")
+    role = models.CharField(max_length=20, choices=[(Membership.Role.JUDGE, "judge"),
+                                                    (Membership.Role.ORGANIZER, "organizer")])
+    note = models.CharField(max_length=200, blank=True, help_text="who it is for, for your own records")
+    tracks = models.ManyToManyField(Track, blank=True)
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=Q(used_by__isnull=True) | Q(used_at__isnull=False),
+                                              name="role_invite_used_has_time")]

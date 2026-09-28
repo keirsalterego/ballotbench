@@ -78,10 +78,27 @@ for page in manage manage/assign manage/progress manage/calibration manage/audit
   expect 403 "participant opens $page"                    GET "/events/$EV/$page" "$PT"
 done
 
+echo "== signed records, bundles and webhooks (tier T4)"
+expect 200 "judge_a fetches own signed record"            GET "/api/judge/record?event=$EV" "$JA"
+expect 403 "judge_b fetches judge_a's record by id"       GET "/api/judge/record?event=$EV&judge=jdg_24" "$JB"
+expect 403 "judge_b fetches judge_a's record by email"    GET "/api/judge/record?event=$EV&judge=diego.herrera@example.org" "$JB"
+expect 403 "participant fetches a judge record"           GET "/api/judge/record?event=$EV" "$PT"
+expect 401 "anonymous fetches a judge record"             GET "/api/judge/record?event=$EV"
+expect 404 "judge_b opens judge_a's certificate"          GET "/events/$EV/certificate?person=diego.herrera@example.org" "$JB"
+expect 401 "anonymous exports the event bundle"           GET "/api/events/$EV/export/bundle.json"
+expect 403 "participant exports the event bundle"         GET "/api/events/$EV/export/bundle.json" "$PT"
+expect 403 "judge exports the event bundle"               GET "/api/events/$EV/export/bundle.json" "$JA"
+expect 403 "participant imports an event"                 POST "/api/events/import?slug=mine" "$PT" '{}'
+expect 401 "anonymous imports an event"                   POST "/api/events/import?slug=mine" "" '{}'
+expect 403 "participant opens manage/webhooks"            GET "/events/$EV/manage/webhooks" "$PT"
+expect 403 "judge opens manage/webhooks"                  GET "/events/$EV/manage/webhooks" "$JA"
+
 echo "== public pages stay public"
 expect 200 "gallery"                                      GET "/projects"
 expect 200 "a submitted project"                          GET "/projects/$A_PROJECT"
 expect 200 "api schema"                                   GET "/api/schema"
+expect 200 "the signing key"                              GET "/.well-known/ballotbench-signing-key"
+expect 200 "the embeddable gallery"                       GET "/embed/$EV"
 
 echo
 echo "$((total - fails)) of $total as expected"

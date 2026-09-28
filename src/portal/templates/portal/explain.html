@@ -1,0 +1,43 @@
+{% extends "portal/base.html" %}
+{% block title %}How {{ project.title }} was scored{% endblock %}
+{% block content %}
+<p><a href="{% url 'results' event.slug %}">{{ event.name }} results</a></p>
+<h1>How {{ project.title }} was scored</h1>
+{% if preview %}<p class="flag">Preview. The team sees this page once the results are published.</p>{% endif %}
+{% if stale %}<p class="flag bad">Scores have changed since these results were calculated. This page explains the published ranking, not the current scores.</p>{% endif %}
+
+{% if row.excluded %}
+<p class="lede">This project isn't in the ranking: {{ row.excluded }}.</p>
+{% else %}
+<p class="lede">Rank {{ row.rank }} of the calibrated results, with a score of {{ row.display|floatformat:3 }} on the rubric's 0 to 1 scale.
+  On these scores it could plausibly have ranked anywhere from {{ row.rank_low }} to {{ row.rank_high }}.</p>
+<p>A plain average of your reviews is {{ row.raw_mean|floatformat:3 }}, which would have ranked {{ row.raw_rank }}.
+  The difference comes from who reviewed you: every judge reads the rubric a little differently, and the calibration takes those habits out.</p>
+{% endif %}
+
+<h2>Your reviews</h2>
+<p>Judges are numbered for this page only. Each row says what that judge gave you, what they give a typical project, and how much their review counted.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Review</th><th class="num">Their score for you</th><th class="num">What they give a typical project</th><th class="num">You versus their usual</th><th class="num">How much it counted</th></tr></thead>
+  <tbody>{% for l in lines %}
+  <tr>
+    <td>{{ l.label }}
+      <span class="hint">{{ l.about }}</span></td>
+    <td class="num">{{ l.score|floatformat:3 }}</td>
+    <td class="num">{{ l.usual|floatformat:3 }}</td>
+    <td class="num">{% if l.flag == "ok" %}{% if l.versus_usual >= 0 %}+{% endif %}{{ l.versus_usual|floatformat:3 }}{% endif %}</td>
+    <td class="num"><span class="bar" style="width: {% widthratio l.share 1 100 %}px" aria-hidden="true"></span> {% widthratio l.share 1 100 %}%</td>
+  </tr>{% endfor %}
+  <tr class="out"><td>The middle <span class="hint">every project starts here and moves as reviews come in</span></td><td></td><td></td><td></td>
+    <td class="num"><span class="bar" style="width: {% widthratio prior_share 1 100 %}px" aria-hidden="true"></span> {% widthratio prior_share 1 100 %}%</td></tr>
+  </tbody>
+</table></div>
+
+<h2>How to read this</h2>
+<ul>
+  <li><strong>You versus their usual</strong> is what matters. A 0.60 from a judge who gives most projects 0.50 is a strong review; the same 0.60 from a judge who gives most projects 0.70 is a weak one.</li>
+  <li><strong>How much it counted</strong> depends on how consistently the judge's scores followed the other judges' on the projects they shared. A judge who gave every project the same score, or wrote only one review, tells us nothing about which project is better, so their review counts for nothing.</li>
+  <li><strong>The middle</strong> is a pull towards an average score. It matters most for projects with few reviews, so that two generous reviews can't carry a project to the top on their own.</li>
+</ul>
+<p class="faint">Scores fingerprint <code>{{ run.input_digest }}</code>. The method is described at <a href="https://github.com/keirsalterego/ballotbench/blob/main/JUDGING.md">JUDGING.md</a>.</p>
+{% endblock %}

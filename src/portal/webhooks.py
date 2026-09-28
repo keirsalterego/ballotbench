@@ -282,7 +282,9 @@ def webhooks_page(request, event):
 def toggle_webhook(request, event, pk):
     hook = get_object_or_404(event.webhooks, pk=pk)
     hook.active = not hook.active
-    hook.save(update_fields=["active"])
+    if hook.active:
+        hook.created_by = request.user      # it sends as whoever resumed it (see audit._enqueue)
+    hook.save(update_fields=["active", "created_by"])
     audit.record("webhook.resume" if hook.active else "webhook.pause", request=request, event=event, obj=hook,
                  after={"url": hook.url})
     messages.success(request, f"{'Resumed' if hook.active else 'Paused'} {hook.url}.")

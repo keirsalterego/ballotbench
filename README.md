@@ -7,6 +7,10 @@ every judge's habits (leniency, how widely they spread marks) are taken out,
 with an honest range for every rank. Deadlines, judge isolation and the audit
 log are enforced by Postgres itself, not just by the pages in front of it.
 
+**[Watch the five-minute demo](https://youtu.be/Z8NRxI5cFX4)**: one whole
+event, from set-up to signed results. **[Read the docs](https://keirsalterego.github.io/ballotbench/)**:
+guides for organizers, participants and judges, the judging maths, the API.
+
 ```text
 T1  gallery is public ................. PASS
 T1  project from fixtures shown ....... PASS

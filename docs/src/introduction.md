@@ -31,6 +31,8 @@ Three things, which the rest of this book keeps coming back to:
 
 ## Where to start
 
+- To see it first: the [five-minute demo video](https://youtu.be/Z8NRxI5cFX4).
+
 - To try it: [Run it in five minutes](guide/quickstart.md).
 - To see a whole event: [A whole event, start to finish](guide/tour.md).
 - To judge the judging: [Assignment, scoring and calibration](judging/method.md).

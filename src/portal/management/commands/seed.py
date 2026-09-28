@@ -87,6 +87,9 @@ class Command(BaseCommand):
             if not ApiToken.objects.filter(token_hash=hash_token(token)).exists():
                 issue_token(user, "demo", token)
         for user in users.values():
+            if user.email_confirmed_at is None:
+                user.email_confirmed_at = timezone.now()
+                user.save(update_fields=["email_confirmed_at"])
             # A fresh row has an empty password, which Django counts as
             # usable; an imported one has an unusable one. Set both, but never
             # overwrite a password someone chose.

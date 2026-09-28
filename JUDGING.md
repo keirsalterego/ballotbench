@@ -241,9 +241,14 @@ Invariance checks on these scores (max |change in q| over all projects):
   PASS  every judge gets a random shift and stretch: 3.1e-15, ranking identical
   PASS  constant judge(s) jdg_07 removed: 0.0e+00, ranking identical
 
+Second opinion: the rubric read as pairwise picks (Bradley-Terry, portal/pairwise.py):
+  254 picks; no picks from jdg_01, jdg_07, jdg_23 (one review, or every pair tied)
+  Kendall's tau with the calibrated ranking 0.646, with raw means 0.628
+  PASS  jdg_24's scores squared (not a shift or stretch): picks identical; the calibration's q moves by up to 0.04, since it only undoes linear habits
+
 Benchmark on synthetic events with a known true order (40 projects, 12 judges, 3 reviews each,
 one harsh judge who only sees the strongest projects). Kendall's tau against the truth:
-  calibration 0.830   raw means 0.677   per-judge z-scores 0.742   (mean of 20 events)
+  calibration 0.830   raw means 0.677   per-judge z-scores 0.742   pairwise picks 0.799   (mean of 20 events)
   calibration beats raw means in 20 of 20, z-scores in 20 of 20
 Every invariance check holds.
 ```
@@ -252,9 +257,32 @@ The benchmark events are synthetic because the fixture has no ground truth.
 Each has 40 projects, 12 judges with their own leniency, scale and noise, and
 one harsh judge who only sees the eight strongest projects: the case that
 breaks z-scores. The model recovers the true order better than raw means and
-better than z-scores in every one of the 20 events.
+better than z-scores in every one of the 20 events, and on average better
+than the pairwise second opinion, which throws away how far apart a judge put
+two projects.
 
-## 9. Publishing results
+## 9. A second opinion: pairwise picks
+
+The calibration undoes linear habits. A judge who squashes only the top of
+the scale is non-linear, and it can't. So the calibration page shows a second
+ranking next to it that no way of using the scale can move.
+
+Every judge who scored two projects differently has, in effect, picked the
+better one. `portal/pairwise.py` collects those picks across all judges and
+fits a Bradley-Terry model, `P(A beats B) = p_A / (p_A + p_B)`, with Hunter's
+MM iteration and one virtual win and loss per project against a reference, a
+weak prior that keeps an unbeaten project finite. Only the order of each
+judge's own scores enters, so any increasing transformation of any judge's
+scores leaves it unchanged; the proof squares one judge's scores to show it.
+The constant judge and the single-review judges make no picks at all.
+
+What it gives up is magnitude: "A slightly better than B" and "A far better
+than B" are the same pick. That's why it's a second opinion rather than the
+ranking. Where the two agree, trust the rank more; where they disagree, the
+project's rank depends on how you read the judges' scales, and its "could be"
+range will usually be wide as well.
+
+## 10. Publishing results
 
 Results are hidden from everyone but the event's organizers until published,
 in the pages and the API (404 before then). Publishing freezes the result to
@@ -264,7 +292,7 @@ check the published ranking came from those scores. Later runs change nothing
 public until someone publishes again, and every run and publication is in the
 audit log.
 
-## 10. Known limits
+## 11. Known limits
 
 - **Linear judges only.** The model corrects a judge who is lenient or who
   spreads scores widely. It can't correct one who only compresses the top of
@@ -281,6 +309,7 @@ audit log.
 
 ## References
 
+- D. Hunter, "MM algorithms for generalized Bradley-Terry models", Annals of Statistics, 2004.
 - N. Lawrence, "Reviewer calibration for NIPS", 2014. https://inverseprobability.com/2014/08/02/reviewer-calibration-for-nips
 - H. Ge, M. Welling, Z. Ghahramani, "A Bayesian model for calibrating conference review scores". https://mlg.eng.cam.ac.uk/hong/unpublished/nips-review-model.pdf
 - M. Roos, J. Rothe, B. Scheuermann, "How to calibrate the scores of biased reviewers", AAAI 2011.

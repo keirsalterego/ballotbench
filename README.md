@@ -151,7 +151,7 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
   limit**. Put it behind a proxy with TLS and rate limiting if it's public.
 - **Calibration assumes linear judges.** It can't correct a judge who only
   compresses the top of the scale, and it can't detect judges who collude.
-  See [known limits](JUDGING.md#10-known-limits).
+  See [known limits](JUDGING.md#11-known-limits).
 - **Deleting a closed event** is a management command (`delete_event`), not a
   button, because the database refuses to delete submitted projects after the
   deadline.

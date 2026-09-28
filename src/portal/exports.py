@@ -3,6 +3,7 @@ audited. Cells that a spreadsheet would read as a formula are prefixed with
 a quote, since project titles and comments come from participants."""
 import csv
 import io
+import json
 
 from django.http import HttpResponse
 from drf_spectacular.utils import extend_schema
@@ -11,7 +12,7 @@ from rest_framework.decorators import api_view
 
 from . import audit
 from .access import organizer_event_or_deny
-from .models import JudgeAssignment, Membership, Project, Review, TeamMember
+from .models import AuditLog, JudgeAssignment, Membership, Project, Review, TeamMember
 from .scoring import weighted_score
 
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
@@ -79,12 +80,46 @@ def scores(event):
                + ["" if total is None else f"{total:.4f}", r.comment])
 
 
+def results(event):
+    """The latest calibration run, ranked: raw and calibrated side by side."""
+    run = event.calibration_runs.order_by("-pk").first()
+    yield ["run", "rank", "raw_rank", "project_id", "project", "reviews", "raw_mean", "calibrated", "se", "excluded",
+           "input_digest"]
+    if run is None:
+        return
+    for r in run.projects.select_related("project").order_by("rank", "excluded", "project_id"):
+        yield [run.pk, r.rank or "", r.raw_rank or "", r.project_id, r.project.title, r.n_reviews,
+               f"{r.raw_mean:.4f}", f"{r.display:.4f}", f"{r.se:.4f}", r.excluded, run.input_digest]
+
+
+def judges(event):
+    """Per-judge calibration from the latest run: offset, scale, noise, flag."""
+    run = event.calibration_runs.order_by("-pk").first()
+    yield ["run", "judge_email", "reviews", "offset", "scale", "noise", "flag"]
+    if run is None:
+        return
+    for j in run.judges.select_related("judge").order_by("judge__email"):
+        yield [run.pk, j.judge.email, j.n_reviews, f"{j.offset:.5f}", f"{j.scale:.5f}", f"{j.noise:.6f}", j.flag]
+
+
+def audit_log(event):
+    yield ["seq", "ts", "actor", "action", "object_type", "object_id", "ip", "before", "after", "prev_hash", "row_hash"]
+    rows = AuditLog.objects.filter(event=event).select_related("actor").order_by("seq")
+    for a in rows:
+        yield [a.seq, a.ts.isoformat(), a.actor.email if a.actor else "", a.action, a.object_type, a.object_id,
+               a.ip or "", json.dumps(a.before, sort_keys=True) if a.before is not None else "",
+               json.dumps(a.after, sort_keys=True) if a.after is not None else "", a.prev_hash, a.row_hash]
+
+
 EXPORTS = {
     "registrations": registrations,
     "teams": teams,
     "projects": projects,
     "assignments": assignments,
     "scores": scores,
+    "results": results,
+    "judges": judges,
+    "audit": audit_log,
 }
 
 

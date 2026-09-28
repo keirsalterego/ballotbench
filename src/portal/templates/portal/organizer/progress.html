@@ -1,11 +1,13 @@
 {% extends "portal/base.html" %}
 {% block title %}Judging progress{% endblock %}
+{% block head %}{% if live %}<meta http-equiv="refresh" content="20">{% endif %}{% endblock %}
 {% block content %}
 <h1>Judging progress</h1>
 {% include "portal/organizer/_nav.html" %}
 <p class="lede">{{ done }} of {{ total }} reviews in ({{ pct }}%).
   {% if low %}{{ low|length }} project{{ low|length|pluralize }} {{ low|length|pluralize:"has,have" }} fewer than {{ event.reviews_per_project }} finished reviews.{% endif %}
   {% if unfilled %}<a href="{% url 'assign' event.slug %}">Hand out {{ unfilled }} more</a>.{% endif %}</p>
+<p>{% if live %}Refreshing every 20 seconds. <a href="?">Stop</a>{% else %}<a href="?live=1">Keep this page up to date</a> while judges work.{% endif %}</p>
 
 <h2>Judges</h2>
 <div class="table-wrap"><table>

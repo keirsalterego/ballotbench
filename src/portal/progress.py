@@ -144,6 +144,7 @@ def progress(request, event):
                            .select_related("judge", "project").order_by("project__title"))
     return render(request, "portal/organizer/progress.html", {
         "event": event, "judges": judges, "projects": projects, "total": total, "done": done,
+        "live": request.GET.get("live") == "1",
         "pct": round(100 * done / total) if total else 0,
         "low": [r for r in projects if r["low"]],
         "unfilled": sum(r["missing"] for r in projects),

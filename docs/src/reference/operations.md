@@ -459,6 +459,6 @@ Things I'd want to know before running an event on it:
 - Mail goes to the outbox table, readable in the admin. For real delivery,
   set `DJANGO_EMAIL_BACKEND` to Django's SMTP backend and configure it.
 - Calibration runs inside the organizer's request. On the fixture that's a
-  few seconds; there's no background worker.
+  few seconds; calibration needs no background worker.
 - Community vote tallies are computed when read. Voiding a ballot after
   publishing changes the public numbers (and is in the audit log).

@@ -13,7 +13,7 @@ The first run builds the image, starts Postgres, creates the tables, loads
 the shared Dogfood fixture event and prints something like:
 
 ```text
-fixture event sample-hack-2026: 8 tracks, 30 judges, 40 teams, 91 members, 41 projects, 126 reviews, 1 duplicates
+fixture event sample-hack-2026: 8 tracks, 30 judges, 40 teams, 91 members, 41 projects, 126 reviews, 1 duplicate
 seeded. test logins:
   organizer    Authorization: Bearer bb_demo_organizer_5c1e0a
   judge_a      Authorization: Bearer bb_demo_judge_a_8d24f1
@@ -50,7 +50,8 @@ The bearer tokens are for scripts and the API: pass them as an
 ## Check what it claims
 
 ```sh
-python3 run.py .dogfood.toml                                   # the official Dogfood checker
+python3 run.py .dogfood.toml                                   # the official Dogfood checker (T1, T2)
+python3 scripts/check_t3_t4.py .dogfood.toml                   # the same style of checks for T3 and T4
 sh scripts/isolation_curl.sh                                   # tries to reach what it shouldn't
 docker compose exec web python manage.py normalization_proof   # the judging maths, recomputed
 docker compose exec web python manage.py verify_audit          # the audit log's hash chain

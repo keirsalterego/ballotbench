@@ -35,12 +35,10 @@ docker compose up
 Open <http://localhost:8080>. The first boot builds the image, creates the
 database, loads the fixture event and prints the demo logins. After the
 images are built it needs no network: no CDN, no web fonts from elsewhere,
-no email service, no hosted anything. To prove it:
-
-```sh
-docker compose down -v
-docker compose -f docker-compose.yml -f docker-compose.offline.yml up
-```
+no email service, no hosted anything. To prove it, switch off your Wi-Fi
+and run `docker compose up`: it still comes up, seeded, on
+<http://localhost:8080>. The [quickstart](https://keirsalterego.github.io/ballotbench/guide/quickstart.html#with-the-network-off)
+has a stricter check with no route out of the containers at all.
 
 ### Demo logins
 
@@ -97,7 +95,8 @@ learn from and why; resolve duplicate submissions; publish results frozen to
 one run; read the audit log; and export every stage as CSV.
 
 **Voters** rank the projects in a community vote, if the organizer turns one
-on: signed-in accounts, or anyone who confirms an email address by a link
+on: signed-in accounts that have confirmed their address, or anyone who
+confirms an email address by a link
 (one ballot per inbox, so `a.b+x@googlemail.com` and `ab@gmail.com` count
 once). Ballots are quadratic: n votes for a project cost n² of a fixed
 budget. Each voter sees the projects in their own random order and can't

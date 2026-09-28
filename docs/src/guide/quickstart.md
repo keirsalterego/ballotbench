@@ -58,12 +58,21 @@ docker compose exec web python manage.py verify_audit          # the audit log's
 
 ## With the network off
 
-Once the images are built, the portal needs no network. Prove it with an
-override that puts the containers on a network with no way out:
+The simplest proof: once the images are built, switch off your Wi-Fi (or
+pull the cable) and run `docker compose up`. The portal comes up, seeded,
+and <http://localhost:8080> works, because a port on your own machine needs
+no outside network.
+
+For a stricter proof, with no route out of the containers at all, there's
+an override. A network with no way out can't publish a port to your
+machine either, so you check it from inside the container, which is what CI
+does on every push:
 
 ```sh
 docker compose down -v
-docker compose -f docker-compose.yml -f docker-compose.offline.yml up
+docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d --wait
+docker compose exec web python -c "import urllib.request as u; print(u.urlopen('http://localhost:8080/projects').status)"
+docker compose down && docker compose up -d --force-recreate      # back to normal
 ```
 
 ## Start over

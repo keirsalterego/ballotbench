@@ -64,13 +64,15 @@ Two events are seeded:
   so calibration and results work straight away.
 - **Demo Hack (open)** is open for submissions for 14 days from the first
   boot, for trying the whole flow: join, form a team, invite someone, submit.
-  Its judging window opens after that; as organizer, move it in Settings.
+  Its judging window and its community vote (signed-in accounts, 25 credits
+  each) open after that; as organizer, move either in Settings to try them
+  now.
 
 ### Check it yourself
 
 ```sh
 python3 run.py .dogfood.toml                                      # the official checker
-sh scripts/isolation_curl.sh                                      # 68 attempts at things you shouldn't reach
+sh scripts/isolation_curl.sh                                      # 79 attempts at things you shouldn't reach
 docker compose exec web python manage.py normalization_proof      # every number in JUDGING.md, recomputed
 docker compose exec web python manage.py verify_audit             # the audit log's hash chain
 ```
@@ -91,6 +93,20 @@ planner that balances load and never gives a judge their own team; watch a
 live progress dashboard; run calibration and read which judges it couldn't
 learn from and why; resolve duplicate submissions; publish results frozen to
 one run; read the audit log; and export every stage as CSV.
+
+**Voters** rank the projects in a community vote, if the organizer turns one
+on: signed-in accounts, or anyone who confirms an email address by a link
+(one ballot per inbox, so `a.b+x@googlemail.com` and `ab@gmail.com` count
+once). Ballots are quadratic: n votes for a project cost n² of a fixed
+budget. Each voter sees the projects in their own random order and can't
+vote for their own team, and nobody sees a tally until voting has closed and
+the organizer publishes. Organizers see the tallies as they come in, next to
+an abuse panel that flags networks with many voters, brand-new accounts and
+identical ballots, and they can void a ballot with a reason. Nothing is
+voided automatically.
+
+**Anyone signed in** comments on submitted projects; the event's organizers
+can hide a comment, and it disappears for everyone else.
 
 **Anyone** browses and searches the public gallery, and reads results once
 they're published.
@@ -113,6 +129,12 @@ they're published.
 - **The fixture's traps are handled visibly**: the constant judge `jdg_07`,
   the single-review judges, the eight projects from unfinished batches, and
   the duplicate `prj_41`.
+- **The vote's rules are in the database too.** A trigger locks the voter's
+  row and checks the window, the budget (sum of votes² within the credits),
+  own team and eligible projects, so two tabs can't overspend a ballot. Rate
+  limits (ballots, email links, comments, logins, sign-ups) are counted in
+  Postgres, so every worker shares them. [THREAT-MODEL.md](THREAT-MODEL.md)
+  lists who attacks a portal like this and what stops them.
 - **A hash-chained audit log** that the database won't let anyone edit, and a
   command that names the first tampered row if a superuser does.
 - **Results you can check.** Each calibration run stores the SHA-256 of the
@@ -125,6 +147,7 @@ they're published.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | components, a request end to end, where each rule is enforced and why |
 | [DATA-MODEL.md](DATA-MODEL.md) | every table, its constraints and triggers, how data gets in and out |
 | [JUDGING.md](JUDGING.md) | assignment, scoring maths, calibration, its guarantees and limits |
+| [THREAT-MODEL.md](THREAT-MODEL.md) | who attacks a hackathon portal, how, and what does and doesn't stop them |
 | [NOTES.md](NOTES.md) | build notes: what broke and what I changed my mind about |
 | `/api/docs` | the API, generated from the same OpenAPI document as `/api/schema` |
 
@@ -142,13 +165,22 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
 
 ## What it doesn't do yet
 
-- **No public voting or comments yet** (tier T3). I'm not claiming T3.
 - **No webhooks, certificates, signed records or embeddable widget** (T4).
   The REST API and its OpenAPI document are there.
-- **No email.** The portal runs offline, so invite links are shown once to
-  whoever creates them. A real deployment would add an SMTP backend.
-- **Sign-up doesn't verify email ownership**, and there is **no login rate
-  limit**. Put it behind a proxy with TLS and rate limiting if it's public.
+- **No email leaves the box.** The portal runs offline, so invite links are
+  shown once to whoever creates them, and voting links land in an outbox
+  table that site admins read in the admin. Set `DJANGO_EMAIL_BACKEND` to
+  Django's SMTP backend to really send them.
+- **Sign-up doesn't verify email ownership.** Logins and sign-ups are rate
+  limited per address, but an account-mode vote is only as strong as the
+  sign-up: someone with many addresses can make many accounts. The abuse
+  panel flags new accounts and shared networks; it doesn't stop them.
+- **Email-mode votes are one per inbox, not one per person.** Someone with
+  ten real inboxes (or a domain with a catch-all) gets ten ballots. There is
+  no CAPTCHA, no phone check and no proof of personhood; the organizer's
+  judgement, helped by the flags, is the last line.
+- **Rate limits trust `REMOTE_ADDR`.** Behind a proxy, configure it to set
+  the client address, or every visitor shares one limit.
 - **Calibration assumes linear judges.** It can't correct a judge who only
   compresses the top of the scale, and it can't detect judges who collude.
   See [known limits](JUDGING.md#10-known-limits).

@@ -36,7 +36,9 @@ Check: `used_by` set only with `used_at`.
 **`portal_event`**: `slug` (unique), `name`, `external_id` (unique),
 `submissions_open/close`, `judging_open/close`, `voting_open/close`,
 `results_published_at`, `published_run` (the calibration run the public
-results are frozen to), `reviews_per_project` (k), `max_team_size`.
+results are frozen to), `voting_mode` (off, account or email),
+`vote_credits` (each voter's quadratic budget), `reviews_per_project` (k),
+`max_team_size`.
 - checks: each window opens before it closes; k ≥ 1; team size ≥ 1
 
 **`portal_track`**: `event`, `name`, `external_id`. Unique `(event, name)`
@@ -116,6 +118,34 @@ ranked: duplicate, not submitted, no usable reviews). Unique `(run, project)`.
 `(run, judge)`.
 
 A run is never updated. Publishing points `event.published_run` at one.
+
+### Community voting and comments
+
+**`portal_voter`**: one ballot in one event. `event`, `user` (account mode)
+or `email` as typed plus `email_normalized` (email mode), `token_hash` (the
+SHA-256 of the one-time confirmation link), `confirmed_at`, `ip`,
+`user_agent`, `voided_at`, `voided_reason`.
+- unique `(event, user)` and `(event, email_normalized)`: one ballot per
+  account and per inbox
+- checks: an account or an address; a voided ballot has a reason
+
+**`portal_vote`**: `voter`, `project`, `votes` (≥ 1; a zero is no row).
+Unique `(voter, project)`.
+- trigger `vote_rules` (migration 0012): locks the voter row, then refuses
+  the write outside the voting window (`BB409`), for a voided or unconfirmed
+  voter (`BB409`), for a project that isn't a submitted, non-duplicate
+  project of the voter's event (`BB422`), for the voter's own team
+  (`BB423`), or when the sum of votes² would pass `vote_credits` (`BB409`).
+
+**`portal_comment`**: `project`, `author`, `body`, `created_at`, `hidden_at`,
+`hidden_by`.
+- checks: body not empty and at most 2000 characters
+
+**`portal_ratehit`**: `key`, `created_at`. One counted action for a rate
+limit; `ratelimit.allow()` deletes a key's rows once they leave its window.
+
+**`portal_outboundemail`**: `to`, `subject`, `body`, `created_at`. Mail the
+portal would send, kept for site admins to read (`portal.mail.OutboxBackend`).
 
 ### The audit log
 

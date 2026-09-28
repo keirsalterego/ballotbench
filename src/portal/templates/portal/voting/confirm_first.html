@@ -1,0 +1,11 @@
+{% extends "portal/base.html" %}
+{% block title %}Confirm your address to vote{% endblock %}
+{% block content %}
+<h1>Confirm your address to vote</h1>
+<p>{{ event.name }} counts one ballot per account, so each account has to show it's a real inbox.
+  We sent a link to <strong>{{ user.email }}</strong> when you signed up.</p>
+<form method="post" action="{% url 'confirm-email-send' %}">{% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.path }}">
+  <button>Send the link again</button>
+</form>
+{% endblock %}

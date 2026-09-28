@@ -206,6 +206,11 @@ def ballot(request, slug):
     event = get_object_or_404(Event, slug=slug)
     if event.voting_mode == Mode.OFF:
         return render(request, "portal/voting/off.html", {"event": event}, status=404)
+    if (event.voting_mode == Mode.ACCOUNT and request.user.is_authenticated
+            and request.user.email_confirmed_at is None):
+        # One ballot per account is only worth something if an account is a
+        # real inbox: confirm it first.
+        return render(request, "portal/voting/confirm_first.html", {"event": event}, status=403)
     voter = current_voter(request, event)
     if voter is None:
         if event.voting_mode == Mode.ACCOUNT:
@@ -362,6 +367,8 @@ def api_ballot(request, slug):
         raise exceptions.NotFound("this event has no community vote")
     if event.voting_mode == Mode.EMAIL:
         raise Conflict("this event votes by email link: use the ballot page")
+    if request.user.is_authenticated and request.user.email_confirmed_at is None:
+        raise exceptions.PermissionDenied("confirm your email address before voting")
     voter = current_voter(request, event)
     if request.method == "POST":
         # Refusals are returned, not raised: DRF rolls back the request's

@@ -2,6 +2,10 @@
 {% block title %}My events{% endblock %}
 {% block content %}
 <h1>My events</h1>
+{% if not user.email_confirmed_at %}
+<p class="flag">Your address isn't confirmed yet, so you can't vote in community votes.
+  <form method="post" action="{% url 'confirm-email-send' %}" class="inline">{% csrf_token %}<button class="link">Send the confirmation link</button></form></p>
+{% endif %}
 {% if memberships %}
 <div class="table-wrap"><table>
   <tr><th>Event</th><th>Role</th><th>Submissions close</th><th></th></tr>

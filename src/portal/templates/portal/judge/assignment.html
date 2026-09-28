@@ -1,0 +1,47 @@
+{% extends "portal/base.html" %}
+{% block title %}Review {{ project.title }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'judge-queue' %}">Your reviews</a></p>
+<h1>{{ project.title }}</h1>
+<p class="lede">{{ project.tagline|default:project.summary }}</p>
+{% if project.description %}<div class="prose">{{ project.description|linebreaks }}</div>{% endif %}
+<p>
+  {% if project.repo_url %}<a href="{{ project.repo_url }}" rel="nofollow noopener">Repository</a>{% endif %}
+  {% if project.demo_url %}<a href="{{ project.demo_url }}" rel="nofollow noopener">Demo</a>{% endif %}
+</p>
+
+{% if closed %}<p class="flag bad">{{ closed }}</p>{% endif %}
+{% if assignment.status == "recused" %}
+  <p class="flag">You stepped aside from this project.</p>
+{% else %}
+<form method="post" class="scoresheet">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}{% if field.name != "comment" %}
+  <fieldset class="bubbles">
+    <legend>{{ field.label }}</legend>
+    {% for radio in field %}{% if radio.data.value != "" %}
+      <label class="bubble">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>
+    {% endif %}{% endfor %}
+    {{ field.errors }}
+  </fieldset>
+  {% endif %}{% endfor %}
+  <label class="field">Comment for the organizers <span class="hint">Other judges never see it.</span>{{ form.comment }}</label>
+  {% if total is not None %}<p>Weighted score so far: <strong class="num">{{ total|floatformat:3 }}</strong> on a 0 to 1 scale.</p>{% endif %}
+  <div class="actions">
+    <button name="save" class="quiet">Save draft</button>
+    <button name="submit">{% if assignment.status == "done" %}Resubmit review{% else %}Submit review{% endif %}</button>
+  </div>
+</form>
+{% if assignment.status != "done" %}
+<details class="recuse">
+  <summary>I have a conflict with this project</summary>
+  <form method="post" action="{% url 'judge-recuse' assignment.pk %}">
+    {% csrf_token %}
+    <label class="field">What's the conflict? <input name="reason" maxlength="500"></label>
+    <button class="danger">Step aside</button>
+  </form>
+</details>
+{% endif %}
+{% endif %}
+{% endblock %}

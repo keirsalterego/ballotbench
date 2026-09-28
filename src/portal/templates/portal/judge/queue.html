@@ -1,0 +1,27 @@
+{% extends "portal/base.html" %}
+{% block title %}Your reviews{% endblock %}
+{% block content %}
+<h1>Your reviews</h1>
+{% for r in rows %}
+<section class="sheet">
+  <h2>{{ r.event.name }}</h2>
+  <p>{{ r.done }} of {{ r.total }} done{% if r.recused %}, {{ r.recused }} stepped aside{% endif %}.
+    {% if r.pending %}About {{ r.minutes }} minutes left at ten minutes a project.{% endif %}</p>
+  {% if r.closed %}<p class="flag bad">{{ r.closed }}</p>{% endif %}
+  <table>
+    <thead><tr><th>Project</th><th>Track</th><th>State</th></tr></thead>
+    <tbody>
+    {% for a in r.assignments %}
+    <tr>
+      <td><a href="{% url 'judge-assignment' a.pk %}">{{ a.project.title }}</a></td>
+      <td>{{ a.project.track.name|default:"" }}</td>
+      <td>{% if a.status == "done" %}submitted{% elif a.status == "recused" %}stepped aside{% elif a.review %}draft saved{% else %}not started{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% empty %}
+<p>You don't judge any event yet. An organizer can send you an invitation link.</p>
+{% endfor %}
+{% endblock %}

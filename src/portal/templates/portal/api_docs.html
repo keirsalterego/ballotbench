@@ -1,0 +1,17 @@
+{% extends "portal/base.html" %}
+{% block title %}API{% endblock %}
+{% block content %}
+<h1>API</h1>
+<p>{{ info.description }} Every page in the portal has an API route behind it. The full OpenAPI 3 document is at
+  <a href="/api/schema">/api/schema</a> (YAML, or JSON with <code>?format=json</code>).</p>
+<p>Refusals mean the same thing everywhere: <strong>401</strong> you sent no credentials, <strong>403</strong> your role can't do this,
+  <strong>404</strong> it isn't there or isn't yours to see, <strong>409</strong> the window for it is closed, <strong>422</strong> the values are out of range.</p>
+<pre>curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/judge/scores</pre>
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>Path</th><th>What it does</th><th>Answers</th></tr></thead>
+  <tbody>{% for e in endpoints %}
+  <tr><td><strong>{{ e.method }}</strong></td><td><code>{{ e.path }}</code>{% if e.params %}<span class="hint">?{{ e.params|join:", " }}</span>{% endif %}</td>
+    <td>{{ e.summary }}</td><td class="num">{{ e.codes|join:" " }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endblock %}

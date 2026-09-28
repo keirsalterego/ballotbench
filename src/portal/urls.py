@@ -1,7 +1,8 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
+from drf_spectacular.views import SpectacularAPIView
 
-from . import api, exports, judge, organizer, oversight, participant, progress, results, views
+from . import api, apidocs, exports, judge, organizer, oversight, participant, progress, results, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -49,6 +50,8 @@ urlpatterns = [
     path("judge/assignments/<int:pk>", judge.assignment_page, name="judge-assignment"),
     path("judge/assignments/<int:pk>/recuse", judge.recuse, name="judge-recuse"),
 
+    path("api/schema", SpectacularAPIView.as_view(), name="api-schema"),
+    path("api/docs", apidocs.api_docs, name="api-docs"),
     path("api/events", api.events, name="api-events"),
     path("api/events/<slug:slug>", api.event_detail, name="api-event"),
     path("api/events/<slug:slug>/projects", api.event_projects, name="api-event-projects"),

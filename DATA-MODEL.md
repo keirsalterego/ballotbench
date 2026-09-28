@@ -181,3 +181,33 @@ status code:
   `GET /api/events/<slug>/export/<kind>.csv`.
 - **JSON**: everything the pages show is in the API (`/api/docs`).
 - **The database itself**: plain Postgres, `pg_dump` works.
+
+## Beyond T2 (tier T4)
+
+**`portal_webhook`**: `event`, `url`, `secret` (64 hex characters; it keys
+the HMAC, so it's stored as is, shown once and never written to the audit
+log), `actions` (text array of action prefixes, empty meaning every change),
+`active`, `created_by`, `created_at`.
+
+**`portal_webhookdelivery`**: the outbox. `webhook`, `action`, `payload`
+(JSON: the audit row's action, event, actor, object, before and after),
+`status` (pending, delivered, failed), `attempts`, `next_attempt_at`
+(defaults to the database clock), `last_error`, `created_at`. Index
+`(status, next_attempt_at)` for the sender. A row is written by
+`audit.record` in the change's transaction, so it rolls back with it. Failed
+sends wait 30 s, then twice as long each time; the eighth failure is final.
+
+**Signed records** aren't stored: each is built from the tables above when
+asked for, and the issuance is an audit row (`record.issue`). The signing key
+is a file (`BALLOTBENCH_SIGNING_KEY_FILE`, `/data/signing_key.pem` in
+Docker), not a table, so a database dump doesn't carry it.
+
+**Event bundles** (`bundles.py`) are the fixture's shape plus `format`,
+`prizes`, `criteria` (with weights and ranges), `assignments` (those without
+a review) and, per row, everything the fixture leaves out: event dates,
+judges' tracks, every project field with `status` and `duplicate_of`, and
+each review's `submitted` flag, time, status and comment. Rows are named by
+`external_id`, or `prj_<pk>` and the like. Importing one as a new event goes
+through `import_event(..., new=True)` with the deadline bypass, in one
+transaction; URLs, emails and every enum are validated first, and the bypass
+is switched off again when the import ends rather than when the request does.

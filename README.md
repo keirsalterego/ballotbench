@@ -70,7 +70,7 @@ Two events are seeded:
 
 ```sh
 python3 run.py .dogfood.toml                                      # the official checker
-sh scripts/isolation_curl.sh                                      # 68 attempts at things you shouldn't reach
+sh scripts/isolation_curl.sh                                      # 83 attempts at things you shouldn't reach
 docker compose exec web python manage.py normalization_proof      # every number in JUDGING.md, recomputed
 docker compose exec web python manage.py verify_audit             # the audit log's hash chain
 ```
@@ -118,6 +118,37 @@ they're published.
 - **Results you can check.** Each calibration run stores the SHA-256 of the
   exact scores it read.
 
+## Beyond T2 (tier T4)
+
+Not claimed in `.dogfood.toml`, because `run.py` can't check it, but built and
+tested (`tests/test_records.py`, `test_embed.py`, `test_bundles.py`,
+`test_webhooks.py`) and probed by `scripts/isolation_curl.sh`:
+
+- **Signed participation records.** `GET /api/judge/record?event=<slug>`
+  (and `/api/participant/record`) returns what you did in an event, never a
+  score, signed with the portal's Ed25519 key. Anyone can check one at
+  `/verify` or `POST /api/verify`, or offline with the public key at
+  `/.well-known/ballotbench-signing-key`. Another judge's record is a 403.
+- **Certificates.** `/events/<slug>/certificate` prints to one clean page
+  (Save as PDF) and carries the signed record and a link that verifies it.
+  Only your own; organizers can open anyone's with `?person=<email>`.
+- **An embeddable gallery.** One tag on any page,
+  `<script src="http://localhost:8080/embed.js" data-event="sample-hack-2026" async></script>`,
+  inserts an iframe of the event's submitted projects (and its results, once
+  published) that sizes itself to its content. `/embed/<slug>` is the only
+  page any site may frame; everything else stays `X-Frame-Options: DENY`.
+- **Event bundles.** `GET /api/events/<slug>/export/bundle.json` is the
+  whole event in one file: the fixture's shape plus dates, rubric weights,
+  prizes, judges' tracks, drafts and every review. `POST
+  /api/events/import?slug=<new>` or `manage.py import_event bundle.json
+  --slug <new>` brings it back as a new event. Exported again it's the same
+  file, and it calibrates to exactly the same numbers.
+- **Webhooks.** Organizers add endpoints under Manage, Webhooks. Every
+  audited change is queued in the change's own transaction and POSTed by the
+  `webhooks` service with an HMAC-SHA256 signature, retried with backoff.
+  Only public addresses, checked when saved and again when sent; set
+  `BALLOTBENCH_WEBHOOKS_ALLOW_PRIVATE=1` for a receiver on your own network.
+
 ## Documents
 
 | | |
@@ -143,8 +174,9 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
 ## What it doesn't do yet
 
 - **No public voting or comments yet** (tier T3). I'm not claiming T3.
-- **No webhooks, certificates, signed records or embeddable widget** (T4).
-  The REST API and its OpenAPI document are there.
+- **Tier T4 isn't claimed**, though everything in
+  [Beyond T2](#beyond-t2-tier-t4) works. The signing key can't be rotated
+  yet: a new key makes records signed by the old one fail to verify.
 - **No email.** The portal runs offline, so invite links are shown once to
   whoever creates them. A real deployment would add an SMTP backend.
 - **Sign-up doesn't verify email ownership**, and there is **no login rate

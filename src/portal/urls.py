@@ -1,7 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from . import api, exports, judge, organizer, participant, progress, views
+from . import api, exports, judge, organizer, participant, progress, results, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -37,6 +37,9 @@ urlpatterns = [
     path("events/<slug:slug>/manage/assign/manual", progress.assign_manual, name="assign-manual"),
     path("events/<slug:slug>/manage/assign/<int:pk>/delete", progress.unassign, name="unassign"),
     path("events/<slug:slug>/manage/progress", progress.progress, name="progress"),
+    path("events/<slug:slug>/manage/calibration", results.calibration_page, name="calibration"),
+    path("events/<slug:slug>/manage/publish", results.publish, name="publish"),
+    path("events/<slug:slug>/results", results.results_page, name="results"),
 
     path("judge", judge.queue, name="judge-queue"),
     path("judge/assignments/<int:pk>", judge.assignment_page, name="judge-assignment"),
@@ -46,6 +49,7 @@ urlpatterns = [
     path("api/events/<slug:slug>", api.event_detail, name="api-event"),
     path("api/events/<slug:slug>/projects", api.event_projects, name="api-event-projects"),
     path("api/events/<slug:slug>/export/<slug:kind>.csv", exports.export_csv, name="api-export"),
+    path("api/events/<slug:slug>/results", results.api_results, name="api-results"),
     path("api/projects/<int:pk>", api.project_detail, name="api-project"),
     path("api/judge/scores", api.judge_scores, name="api-judge-scores"),
     path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),

@@ -34,7 +34,7 @@ csv_export   = "/api/events/sample-hack-2026/export/scores.csv"
 | Line | Meaning |
 |-|-|
 | `base_url` | where the checker sends every request: the port `docker compose up` publishes |
-| `claimed` | the tiers this entry claims. T1 is submissions and the gallery, T2 judging and isolation. Public voting (T3) is being built and isn't claimed. |
+| `claimed` | the tiers this entry claims: T1 (submissions and the gallery) and T2 (judging and isolation), the ones `run.py` has checks for. The public vote (T3) and the stretch pieces (T4) are built and tested, but the checker can't verify them, so they aren't claimed. |
 | `pitch` | a one-line description of the entry; `run.py` doesn't read it |
 | `organizer`, `judge_a`, `judge_b`, `participant` | a complete HTTP header for each role. The checker splits it at the first `:` and sends it as is. These are the demo tokens the seed creates when `BALLOTBENCH_DEMO_SEED=1`. |
 | `gallery` | the public page listing submitted projects |
@@ -100,7 +100,7 @@ The checker tries one peer probe and one participant probe. Passing it
 means little on its own: a portal that returned 403 for every judge request
 would pass. So
 [`scripts/isolation_curl.sh`](https://github.com/keirsalterego/ballotbench/blob/main/scripts/isolation_curl.sh)
-tries 68 things over HTTP, each with the exact status it must get back:
+tries 94 things over HTTP, each with the exact status it must get back:
 
 ```sh
 sh scripts/isolation_curl.sh                         # against http://localhost:8080
@@ -118,8 +118,10 @@ reviewed, the participant's project, another team's project), then:
 | deadline | the participant submits and edits after the close; edits another team's project; a judge and an anonymous caller create projects | 409, 403, 401 |
 | exports | all eight kinds, anonymously, as the participant, as a judge, and as the organizer | 401, 403, 403, 200 |
 | results before publication | anonymous, judge and participant read the fixture's results | 404 |
-| organizer pages | a judge's and the participant's tokens on all seven organizer pages | 403 |
-| public pages | the gallery, a submitted project, the API schema | 200 |
+| organizer pages | a judge's and the participant's tokens on every organizer page | 403 |
+| community vote and comments | reading and casting ballots with no or a made-up token, voting where there's no vote, a made-up voting link, unpublished results, commenting anonymously | 401, 404 |
+| signed records, bundles and webhooks | judge B fetching judge A's record or certificate, the participant and anonymous callers fetching records, exporting or importing bundles, opening the webhooks page; judge A fetching their own record | 403, 404, 401, and 200 for the last |
+| public pages | the gallery, a submitted project and its comments, the API schema, the signing key, the embeddable gallery | 200 |
 
 It prints one line per attempt and a total, and exits with status 1 if
 anything came back different:
@@ -130,7 +132,7 @@ ok   200 judge_a reads own scores
 ok   403 judge_b names judge_a by fixture id
 ...
 
-68 of 68 as expected
+94 of 94 as expected
 ```
 
 Two things to know when running it:

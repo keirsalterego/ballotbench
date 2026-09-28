@@ -77,8 +77,9 @@ Two events are seeded:
 ### Check it yourself
 
 ```sh
-sh scripts/demo.sh --fresh --pause                                # a whole event, narrated, step by step
-python3 run.py .dogfood.toml                                      # the official checker
+sh scripts/demo.sh --fresh --pause                                # a whole event, narrated (--fresh wipes the database)
+python3 run.py .dogfood.toml                                      # the official checker (T1, T2)
+python3 scripts/check_t3_t4.py .dogfood.toml                      # the same style of checks for T3 and T4
 sh scripts/isolation_curl.sh                                      # tries to reach what it shouldn't, and checks public pages stay public
 docker compose exec web python manage.py normalization_proof      # every number in JUDGING.md, recomputed
 docker compose exec web python manage.py verify_audit             # the audit log's hash chain
@@ -247,7 +248,12 @@ cd src
 export DJANGO_DEBUG=1 POSTGRES_PORT=5434 BALLOTBENCH_DEMO_SEED=1
 ../.venv/bin/python manage.py migrate && ../.venv/bin/python manage.py seed
 ../.venv/bin/python manage.py runserver 8080
-cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real Postgres: the triggers are under test
+```
+
+In another terminal, from the repository root:
+
+```sh
+POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real Postgres: the triggers are under test
 ```
 
 ## What it doesn't do yet

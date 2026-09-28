@@ -452,3 +452,42 @@ class OutboundEmail(models.Model):
     subject = models.CharField(max_length=300)
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Webhook(models.Model):
+    """An organizer's endpoint for one event's changes. The secret signs each
+    delivery (HMAC-SHA256), so it is kept as is: shown once when made, and
+    never written to the audit log."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="webhooks")
+    url = models.URLField(max_length=500)
+    secret = models.CharField(max_length=64)
+    actions = ArrayField(models.CharField(max_length=100), default=list, blank=True,
+                         help_text="action prefixes to send, like project or review.submit; empty sends everything")
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def wants(self, action):
+        return not self.actions or any(action.startswith(prefix) for prefix in self.actions)
+
+
+class WebhookDelivery(models.Model):
+    """The outbox. A row is written in the same transaction as the change it
+    reports, so a change that rolls back is never announced; the
+    deliver_webhooks command sends it later and retries with backoff."""
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        DELIVERED = "delivered"
+        FAILED = "failed"
+
+    webhook = models.ForeignKey(Webhook, on_delete=models.CASCADE, related_name="deliveries")
+    action = models.CharField(max_length=100)
+    payload = models.JSONField()
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(db_default=Now())
+    last_error = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "next_attempt_at"])]

@@ -45,6 +45,25 @@ services:
     volumes:
       - webdata:/data
 
+  # Sends queued webhook deliveries (portal/webhooks.py). Same image and
+  # settings as web; it starts once web has migrated the database.
+  webhooks:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    entrypoint: ["python", "manage.py", "deliver_webhooks"]
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PASSWORD: ballotbench
+      DJANGO_SECRET_KEY_FILE: /data/secret_key
+      DJANGO_ALLOWED_HOSTS: localhost
+    restart: unless-stopped
+    volumes:
+      - webdata:/data
+
 volumes:
   pgdata:
   webdata:

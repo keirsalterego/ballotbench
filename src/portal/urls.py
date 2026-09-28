@@ -3,7 +3,7 @@ from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
 from . import api, apidocs, exports, judge, organizer, oversight, participant, progress, results, views
-from . import bundles, embed, records  # tier T4
+from . import bundles, embed, records, webhooks  # tier T4
 
 urlpatterns = [
     path("", views.gallery),
@@ -64,7 +64,7 @@ urlpatterns = [
     path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),
     path("api/judge/assignments/<int:pk>/review", judge.api_review, name="api-judge-review"),
 
-    # Tier T4: signed records, certificates, the embeddable gallery, event bundles.
+    # Tier T4: signed records, certificates, the embeddable gallery, event bundles, webhooks.
     path("events/<slug:slug>/certificate", records.certificate, name="certificate"),
     path("verify", records.verify_page, name="verify"),
     path(".well-known/ballotbench-signing-key", records.signing_key, name="signing-key"),
@@ -74,4 +74,7 @@ urlpatterns = [
     path("embed/<slug:slug>", embed.embed, name="embed"),
     path("embed.js", embed.embed_js, name="embed-js"),
     path("api/events/<slug:slug>/export/bundle.json", bundles.export_bundle_view, name="api-export-bundle"),
+    path("events/<slug:slug>/manage/webhooks", webhooks.webhooks_page, name="webhooks"),
+    path("events/<slug:slug>/manage/webhooks/<int:pk>/toggle", webhooks.toggle_webhook, name="webhook-toggle"),
+    path("events/<slug:slug>/manage/webhooks/<int:pk>/delete", webhooks.delete_webhook, name="webhook-delete"),
 ]

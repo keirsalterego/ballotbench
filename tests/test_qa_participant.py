@@ -118,6 +118,16 @@ def test_the_page_disables_buttons_once_a_form_is_sent(web):
     assert "e.submitter" in page and "b.disabled = true" in page
 
 
+def test_the_same_comment_twice_within_a_minute_is_refused(api):
+    project = Project.objects.filter(event__slug=EVENT, status="submitted").order_by("pk").first()
+    url, body = f"/api/projects/{project.pk}/comments", {"body": "Nice."}
+    assert api("participant").post(url, body, content_type="application/json").status_code == 201
+    second = api("participant").post(url, body, content_type="application/json")
+    assert second.status_code == 409 and "just posted" in second.json()["detail"]
+    Comment.objects.filter(project=project).update(created_at=db_now() - timedelta(seconds=61))
+    assert api("participant").post(url, body, content_type="application/json").status_code == 201
+
+
 def test_after_the_deadline_the_project_page_is_read_only(web):
     own = Project.objects.filter(event__slug=EVENT, team__members__user__email=EMAILS["participant"]).first()
     response = web("participant").get(f"/events/{EVENT}/project/{own.pk}/edit")

@@ -28,6 +28,7 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PASSWORD: ballotbench
       DJANGO_SECRET_KEY_FILE: /data/secret_key
+      BALLOTBENCH_SIGNING_KEY_FILE: /data/signing_key.pem
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,[::1],web
       # Fixed demo logins and tokens for the acceptance checker and the demo.
       # Set to 0 for a real deployment and they are never created.

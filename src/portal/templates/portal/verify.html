@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}
+{% block title %}Check a record{% endblock %}
+{% block content %}
+<h1>Check a participation record</h1>
+<p>Paste a record this portal issued, from a certificate or from the API, to see whether it's genuine. The check uses only the portal's public key, so it doesn't matter who hands you the record.</p>
+{% if valid %}
+<div class="sheet">
+  <p class="flag good">{{ reason }}</p>
+  <dl class="facts">
+    <dt>Who</dt><dd>{{ record.person.name }}{% if record.person.email != record.person.name %} <span class="faint">{{ record.person.email }}</span>{% endif %}</dd>
+    <dt>Event</dt><dd>{{ record.event.name }}</dd>
+    {% if record.role == "judge" %}
+    <dt>Judged</dt><dd>{{ record.projects_assigned }} project{{ record.projects_assigned|pluralize }} assigned, {{ record.reviews_submitted }} review{{ record.reviews_submitted|pluralize }} submitted</dd>
+    {% if record.first_review_at %}<dt>Reviews between</dt><dd>{{ record.first_review_at }} and {{ record.last_review_at }}</dd>{% endif %}
+    {% else %}
+    <dt>Took part</dt><dd>{% if record.team %}on team {{ record.team }}{% else %}registered, without a team{% endif %}</dd>
+    {% for p in record.projects %}<dt>Submitted</dt><dd>{{ p.title }}, {{ p.submitted_at }}</dd>{% endfor %}
+    {% endif %}
+    <dt>Issued</dt><dd>{{ record.issued_at }}</dd>
+    <dt>Signing key</dt><dd><code>{{ record.key_id }}</code></dd>
+  </dl>
+</div>
+{% elif valid is False %}
+<p class="flag bad">Not valid. {{ reason }}</p>
+{% endif %}
+<form method="post" class="stack">{% csrf_token %}
+  <label>Record
+    <textarea name="record" rows="8" required spellcheck="false" placeholder='{"record": {...}, "signature": "..."}'>{{ text }}</textarea></label>
+  <div class="actions"><button>Check it</button></div>
+</form>
+
+<h2>Check it yourself, offline</h2>
+<p>This portal's key is <code>{{ key.key_id }}</code>; the full public key is at <a href="/.well-known/ballotbench-signing-key">/.well-known/ballotbench-signing-key</a>. The signature is Ed25519 over the record's canonical JSON: keys sorted, no spaces, UTF-8. With Python and the <code>cryptography</code> package:</p>
+<pre>import base64, json
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+key = Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode("{{ key.public_key }}="))
+doc = json.load(open("record.json"))
+body = json.dumps(doc["record"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+key.verify(base64.urlsafe_b64decode(doc["signature"] + "=="), body)   # raises if it isn't genuine</pre>
+{% endblock %}

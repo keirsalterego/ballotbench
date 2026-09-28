@@ -191,3 +191,18 @@ dl.facts dd { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* A certificate: one sheet on screen, one clean page from the printer. */
+.certificate { max-width: 46rem; margin: 0 auto calc(var(--step) * 6); padding: calc(var(--step) * 10) calc(var(--step) * 10) calc(var(--step) * 8); }
+.certificate h1 { font-size: clamp(2rem, 1.4rem + 2.4vw, 2.8rem); margin-bottom: calc(var(--step) * 6); }
+.certificate h1::after { content: ""; display: block; width: 6rem; height: .45rem; margin-top: calc(var(--step) * 3); background: var(--mark); }
+.certificate .record { font-size: .72rem; line-height: 1.4; }
+.noprint { text-align: center; margin: 0 auto; }
+@media print {
+  :root { --paper: #fff; --sheet: #fff; --ink: #111; --faint: #444; --rule: #999; --action: #111; --mark: #d9b92c; color-scheme: light; }
+  @page { size: A4; margin: 14mm; }
+  body:has(.certificate) .masthead, body:has(.certificate) .messages, .noprint { display: none; }
+  body:has(.certificate) main { padding: 0; max-width: none; }
+  .certificate { border: 1px solid var(--rule); border-top: 3px solid var(--ink); margin: 0; break-inside: avoid; }
+  .certificate a { color: inherit; }
+}

@@ -1,0 +1,24 @@
+{% extends "portal/base.html" %}
+{% block title %}Certificate: {{ event.name }}{% endblock %}
+{% block content %}
+<article class="certificate sheet">
+  <p class="faint">{{ event.name }}</p>
+  <h1>{% if facts.role == "judge" %}Certificate of judging{% else %}Certificate of participation{% endif %}</h1>
+  <p class="lede">This certifies that <strong>{{ facts.person.name }}</strong>
+  {% if facts.role == "judge" %}
+    judged {{ event.name }}, reviewing {{ facts.projects_assigned }} project{{ facts.projects_assigned|pluralize }} and submitting {{ facts.reviews_submitted }} review{{ facts.reviews_submitted|pluralize }}{% if facts.first_review_at|date:"Ymd" == facts.last_review_at|date:"Ymd" %}{% if facts.first_review_at %} on {{ facts.first_review_at|date:"j F Y" }}{% endif %}{% else %} between {{ facts.first_review_at|date:"j F Y" }} and {{ facts.last_review_at|date:"j F Y" }}{% endif %}.
+  {% elif facts.team %}
+    took part in {{ event.name }} as a member of team {{ facts.team }}{% if facts.projects %}, which submitted {% for p in facts.projects %}<em>{{ p.title }}</em> on {{ p.submitted_at|date:"j F Y" }}{% if not forloop.last %} and {% endif %}{% endfor %}{% endif %}.
+  {% else %}
+    registered for {{ event.name }}.
+  {% endif %}</p>
+  <dl class="facts">
+    <dt>Issued</dt><dd>{{ facts.issued_at|date:"j F Y, H:i" }} UTC</dd>
+    <dt>Signing key</dt><dd><code>{{ doc.record.key_id }}</code></dd>
+  </dl>
+  <h2>Signed record</h2>
+  <p>The record below is signed by this portal. To check it, open <a href="{{ verify_url }}">{{ facts.verify_at }}</a> and paste it in, or verify it offline with the public key at <code>/.well-known/ballotbench-signing-key</code>.</p>
+  <pre class="record">{{ compact }}</pre>
+</article>
+<p class="noprint faint">To keep a copy, print this page and choose Save as PDF. It fits on one sheet.</p>
+{% endblock %}

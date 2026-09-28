@@ -99,6 +99,10 @@ STORAGES = {
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+# The Ed25519 key that signs participation records, made on first use. In
+# Docker it lives on the data volume; in development, in the ignored data/.
+SIGNING_KEY_FILE = env("BALLOTBENCH_SIGNING_KEY_FILE", str(BASE_DIR.parent / "data" / "signing_key.pem"))
+
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"

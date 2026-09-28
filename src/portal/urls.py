@@ -2,7 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
-from . import api, apidocs, exports, judge, organizer, oversight, participant, progress, results, views
+from . import api, apidocs, exports, judge, organizer, oversight, participant, progress, records, results, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -61,4 +61,12 @@ urlpatterns = [
     path("api/judge/scores", api.judge_scores, name="api-judge-scores"),
     path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),
     path("api/judge/assignments/<int:pk>/review", judge.api_review, name="api-judge-review"),
+
+    # Tier T4: signed records, certificates.
+    path("events/<slug:slug>/certificate", records.certificate, name="certificate"),
+    path("verify", records.verify_page, name="verify"),
+    path(".well-known/ballotbench-signing-key", records.signing_key, name="signing-key"),
+    path("api/verify", records.api_verify, name="api-verify"),
+    path("api/judge/record", records.api_judge_record, name="api-judge-record"),
+    path("api/participant/record", records.api_participant_record, name="api-participant-record"),
 ]

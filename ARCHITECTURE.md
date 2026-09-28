@@ -154,9 +154,11 @@ The same everywhere, pages and API:
 - **Webhooks are the one background worker.** `audit.record` queues a
   `WebhookDelivery` next to the audit row, in the same transaction, so the
   outbox and the log can't disagree. A separate `webhooks` service (same
-  image) sends them, taking row locks with `SKIP LOCKED` so two senders never
-  send the same one. The web process never makes an outbound request.
+  image) sends them: it claims a round, one due delivery per webhook, by
+  leasing them under `SKIP LOCKED` row locks (so two senders never claim the
+  same one), commits, and sends them all at once with nothing locked. The
+  web process never makes an outbound request.
 - **SSRF.** A webhook URL must resolve only to public addresses, when it's
   saved and again at every send, and the connection goes to the address that
-  was checked (no second DNS lookup to rebind), with a 5 s timeout and no
-  redirects.
+  was checked (no second DNS lookup to rebind), with one 10 s deadline for
+  the whole attempt and no redirects.

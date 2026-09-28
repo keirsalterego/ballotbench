@@ -1,0 +1,17 @@
+{% extends "portal/base.html" %}
+{% block title %}{% if project.pk %}Edit {{ project.title }}{% else %}New project{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if project.pk %}Edit {{ project.title }}{% else %}New project{% endif %}</h1>
+<p class="muted">{{ event.name }}: editable until {{ event.submissions_close|date:"j M Y H:i" }} UTC.</p>
+{% if closed %}<p class="badge bad">{{ closed }}</p>{% endif %}
+<form method="post" class="stack">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}<label>{{ field.label }} {{ field }} {% if field.help_text %}<span class="muted">{{ field.help_text }}</span>{% endif %} {{ field.errors }}</label>{% endfor %}
+  <div class="filters">
+    <button name="save">Save draft</button>
+    {% if project.status != "submitted" %}<button name="submit">Submit</button>{% endif %}
+  </div>
+  <p class="muted">A draft is visible to your team and the organizers only. Once submitted, it's in the public gallery; you can keep editing until the deadline.</p>
+</form>
+{% endblock %}

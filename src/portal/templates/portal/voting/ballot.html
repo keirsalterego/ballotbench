@@ -15,7 +15,8 @@
   {% for row in rows %}
   <fieldset class="bubbles">
     <legend><a href="{% url 'project' row.project.pk %}">{{ row.project.title }}</a>
-      <span class="hint">by {{ row.project.team.name }}{% if row.project.track %}, in {{ row.project.track.name }}{% endif %}. {{ row.project.tagline|default:row.project.summary|truncatechars:140 }}</span></legend>
+      <span class="hint">by {{ row.project.team.name }}{% if row.project.track %}, in {{ row.project.track.name }}{% endif %}</span>
+      {% with blurb=row.project.tagline|default:row.project.summary %}{% if blurb %}<span class="hint">{{ blurb|truncatechars:140 }}</span>{% endif %}{% endwith %}</legend>
     {% if row.own %}
       <p class="muted">Your team's project, so you can't vote for it.</p>
     {% elif choices %}

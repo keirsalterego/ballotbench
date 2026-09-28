@@ -5,7 +5,7 @@ in the database: foreign keys, unique and check constraints, and triggers.
 The application checks the same rules first so it can answer with a clear
 409 or 422, but it doesn't have to be right for the data to stay right.
 Models are in `src/portal/models.py`; triggers are in the migrations
-`0002` to `0005`.
+`0002` to `0005`, plus the voting rules in `0012` (12 triggers in all).
 
 ## Tables
 
@@ -13,7 +13,9 @@ Models are in `src/portal/models.py`; triggers are in the migrations
 
 **`portal_user`**: an account. Signs in with `email` (unique, and a check
 constraint keeps it lowercase). `is_staff` is the global admin role; every
-other role is per event.
+other role is per event. `email_confirmed_at` is set when the person proves
+they read the inbox (a signed confirmation link, or a completed password
+reset); account-mode community votes need it.
 
 **`portal_apitoken`**: `user`, `label`, `token_hash` (unique), `created_at`,
 `revoked_at`. Only the SHA-256 of a token is stored; the token itself is shown

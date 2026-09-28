@@ -6,7 +6,8 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import F, Q
-from django.db.models.functions import Lower, Now
+from django.db.models.functions import Length, Lower, Now
+from django.db.models.lookups import LessThanOrEqual
 
 
 class UserManager(BaseUserManager):
@@ -404,6 +405,9 @@ class Voter(models.Model):
             models.UniqueConstraint(fields=["event", "email_normalized"], name="one_ballot_per_inbox"),
             models.CheckConstraint(condition=Q(user__isnull=False) | Q(email_normalized__isnull=False),
                                    name="voter_has_identity"),
+            # A voided ballot says why, so the next organizer can judge the call.
+            models.CheckConstraint(condition=Q(voided_at__isnull=True) | ~Q(voided_reason=""),
+                                   name="voter_void_has_reason"),
         ]
 
 
@@ -432,7 +436,11 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ["created_at"]
-        constraints = [models.CheckConstraint(condition=~Q(body=""), name="comment_not_empty")]
+        constraints = [
+            models.CheckConstraint(condition=~Q(body=""), name="comment_not_empty"),
+            # max_length on a TextField is only a form hint; this one holds.
+            models.CheckConstraint(condition=LessThanOrEqual(Length("body"), 2000), name="comment_max_length"),
+        ]
 
 
 class RateHit(models.Model):

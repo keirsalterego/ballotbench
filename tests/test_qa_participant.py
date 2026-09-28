@@ -149,6 +149,13 @@ def test_take_part_lists_only_events_still_taking_submissions(web):
     assert "QA over" not in page and "Sample Hack" not in page
 
 
+def test_signing_up_from_an_invite_doesnt_say_join_an_event(web):
+    response = web().post("/signup?next=/invite/abc", {"name": "New", "email": "qa-signup@example.org",
+                                                       "password": "a long enough passphrase"})
+    assert response.url == "/invite/abc"
+    assert not any("Join an event" in m for m in flashed(response))
+
+
 def test_a_full_team_offers_no_invite_and_its_links_no_join_button(me, web):
     client, event, user = me
     Event.objects.filter(pk=event.pk).update(max_team_size=1)

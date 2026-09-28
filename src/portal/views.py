@@ -161,12 +161,13 @@ def signup(request):
         audit.record("user.signup", request=request, actor=user, obj=user, after={"email": user.email})
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         send_confirmation(request, user)
-        messages.success(request, "Welcome. Join an event below, or open an invite link from your team.")
         target = request.GET.get("next", "")
         # Only follow `next` to a page on this site, never to another host.
         if not url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()},
                                                require_https=request.is_secure()):
             target = "home"
+        messages.success(request, "Welcome. Join an event below, or open an invite link from your team."
+                         if target == "home" else "Welcome. Your account is ready.")
         return redirect(target)
     return render(request, "registration/signup.html", {"form": form})
 

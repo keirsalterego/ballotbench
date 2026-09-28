@@ -345,6 +345,13 @@ check the published ranking came from those scores. Later runs change nothing
 public until someone publishes again, and every run and publication is in the
 audit log.
 
+The published ranking is also available as one signed document,
+`/api/events/<slug>/results/signed`: the event, the run, the scores' digest
+and every rank with its "could be" range, signed with the portal's Ed25519
+key. Anyone who saved a copy on results day can check it at `/verify`, or
+offline with the public key at `/.well-known/ballotbench-signing-key`, and hold
+the portal to it if the page ever says something else.
+
 ## 14. Known limits
 
 - **Linear judges only.** The model corrects a judge who is lenient or who

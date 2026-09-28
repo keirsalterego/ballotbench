@@ -154,7 +154,9 @@ they're published.
 - **A hash-chained audit log** that the database won't let anyone edit, and a
   command that names the first tampered row if a superuser does.
 - **Results you can check.** Each calibration run stores the SHA-256 of the
-  exact scores it read.
+  exact scores it read, and the published ranking is available as an
+  Ed25519-signed document anyone can verify offline, so the portal can be held
+  to what it published.
 
 ## Beyond T2 (tier T4)
 

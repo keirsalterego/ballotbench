@@ -123,6 +123,44 @@ def test_the_podium_line_counts_overall_prizes_only(event):
     assert podium_line(event) == 2
 
 
+def test_the_results_page_lists_the_prizes(web, event):
+    Prize.objects.create(event=event, name="Grand prize")
+    web("organizer").post(f"/events/{EVENT}/manage/calibration")
+    assert "Grand prize" in web("organizer").get(f"/events/{EVENT}/results").content.decode()
+
+
+def test_calibration_with_nothing_rankable_offers_no_publish(web):
+    client = web("organizer")
+    client.post(f"/events/{DEMO}/manage/calibration")
+    page = client.get(f"/events/{DEMO}/manage/calibration").content.decode()
+    assert "Nothing to publish" in page and "Publish results" not in page
+    response = client.post(f"/events/{DEMO}/manage/publish")
+    assert response.status_code == 409 and f"/events/{DEMO}/manage/calibration" in response.content.decode()
+    assert Event.objects.get(slug=DEMO).published_run_id is None
+
+
+def test_calibration_explains_why_publish_waits_for_the_vote(web, event):
+    client = web("organizer")
+    client.post(f"/events/{EVENT}/manage/calibration")
+    now = timezone.now()
+    Event.objects.filter(pk=event.pk).update(voting_mode="account", voting_open=now - timedelta(hours=1),
+                                              voting_close=now + timedelta(days=1))
+    page = client.get(f"/events/{EVENT}/manage/calibration").content.decode()
+    assert "community vote is open" in page and "Publish results" not in page
+    refused = client.post(f"/events/{EVENT}/manage/publish").content.decode()
+    assert f"/events/{EVENT}/manage/calibration" in refused and "server&#x27;s clock" not in refused
+
+
+def test_runs_are_numbered_per_event(web, api, event):
+    client = web("organizer")
+    client.post(f"/events/{DEMO}/manage/calibration")      # another event's run takes a pk first
+    client.post(f"/events/{EVENT}/manage/calibration")
+    n = CalibrationRun.objects.filter(event=event).count()
+    assert "<h2>Run 1</h2>" in client.get(f"/events/{DEMO}/manage/calibration").content.decode()
+    body = api("organizer").get(f"/api/events/{EVENT}/results").json()
+    assert body["run_number"] == n and body["run"] == CalibrationRun.objects.filter(event=event).latest("pk").pk
+
+
 def test_progress_offers_only_what_the_planner_can_fill(web, event):
     Event.objects.filter(pk=event.pk).update(reviews_per_project=10)
     event.refresh_from_db()

@@ -3,6 +3,7 @@
 {% block content %}
 <h1>{{ heading|default:"That window is closed" }}</h1>
 <p>{{ reason|default:"This action isn't open right now." }}</p>
-<p class="muted">Deadlines are checked on the server's clock. Nothing was changed.</p>
-<p><a href="{% url 'home' %}">Back to my events</a></p>
+{% if back %}<p><a href="{{ back.url }}">{{ back.label }}</a></p>
+{% else %}{% if not heading %}<p class="muted">Deadlines are checked on the server's clock. Nothing was changed.</p>{% endif %}
+<p><a href="{% url 'home' %}">Back to my events</a></p>{% endif %}
 {% endblock %}

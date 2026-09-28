@@ -27,7 +27,7 @@ random events.
 
 ## The confirmation link that confirmed itself
 
-My first voting link confirmed the voter on GET, which is what the spec
+My first voting link confirmed the voter on GET, which is what my plan
 said and what every tutorial does. Then I remembered that corporate mail
 scanners (and some webmail previews) fetch every link in a message before
 the person sees it. With a single-use token, the scanner would use it up and
@@ -59,7 +59,7 @@ several voters casting the same ballot, which is the one thing it was for.
 
 ## One inbox, one ballot, and not telling anyone who voted
 
-The spec said a second sign-up with another spelling of the same inbox
+My plan said a second sign-up with another spelling of the same inbox
 (`a.b+x@googlemail.com` after `ab@gmail.com`) must be refused. Saying "that
 inbox has already voted" would let anyone check whether a given address
 voted. Instead the page reads the same either way, no second ballot is made,

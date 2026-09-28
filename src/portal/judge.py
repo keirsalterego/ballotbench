@@ -39,6 +39,10 @@ def save_review(request, assignment, values, comment, submit):
     event = assignment.event
     if reason := judging_closed_reason(event):
         raise Conflict(reason)
+    if event.results_published_at:
+        # A judge who has seen the published ranking could otherwise go back
+        # and rescore. Unpublishing reopens reviews.
+        raise Conflict("results are published, so reviews are closed")
     if assignment.status == JudgeAssignment.Status.RECUSED:
         raise Conflict("you recused yourself from this project")
     criteria = list(event.criteria.all())

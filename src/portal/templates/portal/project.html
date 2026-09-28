@@ -32,7 +32,7 @@
 {% else %}<p class="muted">No comments yet.</p>{% endif %}
 {% if project.status == "submitted" %}
   {% if user.is_authenticated %}
-  <form method="post" action="{% url 'comment-add' project.pk %}" class="stack">{% csrf_token %}
+  <form method="post" action="{% url 'comment-add' project.pk %}" class="stack sheet">{% csrf_token %}
     <label>Add a comment <textarea name="body" rows="4" maxlength="2000" required></textarea>
       <span class="muted">Plain text, up to 2000 characters. The team will read it, so be kind and specific.</span></label>
     <div><button>Post comment</button></div>

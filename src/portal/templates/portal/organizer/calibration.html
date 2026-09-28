@@ -1,0 +1,66 @@
+{% extends "portal/base.html" %}
+{% block title %}Calibration{% endblock %}
+{% block content %}
+<h1>Calibration</h1>
+{% include "portal/organizer/_nav.html" %}
+<p>Every judge reads the rubric a little differently. This puts them on one scale: it learns each judge's leniency,
+  how strongly they separate good from weak, and how noisy they are, from the projects they share with other judges.
+  <a href="https://github.com/keirsalterego/ballotbench/blob/main/JUDGING.md">How it works</a>.</p>
+<form method="post" class="actions">{% csrf_token %}<button>{% if run %}Run it again on the current scores{% else %}Run calibration{% endif %}</button></form>
+
+{% if run %}
+<h2>Run {{ run.pk }}</h2>
+<dl class="facts">
+  <dt>When</dt><dd>{{ run.created_at|date:"j M Y, H:i" }} UTC{% if run.created_by %}, by {{ run.created_by.email }}{% endif %}</dd>
+  <dt>Reviews read</dt><dd>{{ run.n_reviews }}</dd>
+  <dt>Fingerprint</dt><dd><code>{{ run.input_digest }}</code><span class="hint">SHA-256 of exactly the scores this run read. Recompute it from the scores export to check nothing changed.</span></dd>
+  <dt>Judges linked</dt><dd>{% if run.connected %}Yes: every judge shares projects, directly or through others.{% else %}<span class="flag bad">No. Some judges share no projects with the rest, so their scales can't be compared. Hand out bridging reviews.</span>{% endif %}</dd>
+  <dt>Agreement</dt><dd>
+    {% if run.signal_p is None %}No reviews yet.
+    {% elif run.signal_p < 0.05 %}The judges agree on which projects are better far more than chance would (p = {{ run.signal_p|floatformat:3 }}).
+    {% else %}<span class="flag">The judges agree no more than chance would (p = {{ run.signal_p|floatformat:2 }}).</span> Calibration removes judge habits but can't create a signal that isn't in the scores, so treat close ranks as ties.{% endif %}</dd>
+</dl>
+
+{% if flagged %}
+<h2>Judges the model couldn't learn from</h2>
+<p>Their reviews carry no weight in the calibrated scores, exactly as if they weren't there. Raw means still include them.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Judge</th><th class="num">Reviews</th><th>Why</th></tr></thead>
+  <tbody>{% for j in flagged %}
+  <tr><td>{{ j.judge.name|default:j.judge.email }}</td><td class="num">{{ j.n_reviews }}</td>
+    <td>{% if j.flag == "constant" %}Gave every project the same score, so their scores say nothing about which is better.
+        {% elif j.flag == "single_review" %}Only one review: there's nothing to compare it with.
+        {% else %}Their scores don't rise with everyone else's on the projects they share.{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+
+<h2>Ranking</h2>
+<p>Calibrated scores are on the rubric's 0 to 1 scale. The ± is one standard error: projects whose ranges overlap are close to a tie.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th class="num">Rank</th><th class="num">Raw rank</th><th>Project</th><th class="num">Reviews</th><th class="num">Raw mean</th><th class="num">Calibrated</th><th></th></tr></thead>
+  <tbody>{% for r in rows %}
+  <tr{% if not r.rank %} class="out"{% endif %}>
+    <td class="num">{{ r.rank|default:"" }}</td>
+    <td class="num">{{ r.raw_rank|default:"" }}{% if r.moved %} <span class="{% if r.moved > 0 %}moved-up{% else %}moved-down{% endif %}">{% if r.moved > 0 %}up {{ r.moved }}{% else %}down {{ r.moved|stringformat:"d"|slice:"1:" }}{% endif %}</span>{% endif %}</td>
+    <td><a href="{% url 'project' r.project_id %}">{{ r.project.title }}</a>
+      {% if r.excluded %}<span class="flag">left out: {{ r.excluded }}</span>{% elif r.n_reviews < k %}<span class="flag">low coverage</span>{% endif %}</td>
+    <td class="num">{{ r.n_reviews }}</td>
+    <td class="num">{{ r.raw_mean|floatformat:3 }}</td>
+    <td class="num">{{ r.display|floatformat:3 }} ± {{ r.se|floatformat:3 }}</td>
+    <td></td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Publish</h2>
+{% if event.published_run_id %}
+<p>Results from run {{ event.published_run_id }} are public since {{ event.results_published_at|date:"j M Y, H:i" }} UTC. <a href="{% url 'results' event.slug %}">See the public page</a>.</p>
+<form method="post" action="{% url 'publish' event.slug %}" class="actions">{% csrf_token %}
+  {% if event.published_run_id != run.pk %}<button>Publish run {{ run.pk }} instead</button>{% endif %}
+  <button class="danger" name="action" value="unpublish">Hide the results again</button></form>
+{% else %}
+<p>Nobody but the organizers can see this ranking yet. Publishing freezes it to run {{ run.pk }}.</p>
+<form method="post" action="{% url 'publish' event.slug %}">{% csrf_token %}<button>Publish results</button></form>
+{% endif %}
+{% endif %}
+{% endblock %}

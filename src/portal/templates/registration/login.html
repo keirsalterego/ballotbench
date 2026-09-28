@@ -1,0 +1,14 @@
+{% extends "portal/base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<h1>Log in</h1>
+<form method="post" class="stack">
+  {% csrf_token %}
+  {% if form.errors %}<p class="badge bad">Email or password is wrong.</p>{% endif %}
+  <label>Email <input type="email" name="username" autocomplete="username" required autofocus></label>
+  <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+  <input type="hidden" name="next" value="{{ next }}">
+  <button>Log in</button>
+</form>
+<p class="muted">No account? <a href="{% url 'signup' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Sign up</a>.</p>
+{% endblock %}

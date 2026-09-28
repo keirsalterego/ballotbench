@@ -127,3 +127,22 @@ def test_signal_test_sees_signal_when_there_is_some():
 def test_digest_ignores_order():
     rows = [["jdg_01", "prj_01", 3], ["jdg_02", "prj_01", 4]]
     assert digest(rows) == digest(list(reversed(rows)))
+
+
+def test_the_proof_command_passes_on_the_seeded_event(db):
+    import io
+    from django.core.management import call_command
+    out = io.StringIO()
+    call_command("normalization_proof", stdout=out)
+    text = out.getvalue()
+    assert "Every invariance check holds." in text
+    assert "jdg_07" in text and "constant" in text
+
+
+def test_bootstrap_intervals_are_wide_on_noise_and_narrow_on_signal():
+    from portal.calibration import bootstrap
+    noise = bootstrap(fixture_obs(), resamples=60)
+    obs, _ = synthetic(2)
+    signal = bootstrap(obs, resamples=60)
+    width = lambda b: sorted(h - l for l, h, _ in b.values())[len(b) // 2]
+    assert width(noise) > 2 * width(signal)

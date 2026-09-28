@@ -23,6 +23,21 @@
 {% else %}
   <p class="flag good">Every project already has {{ k }} review{{ k|pluralize }} handed out, or no judge is left who may take one.</p>
 {% endif %}
+<h2>Where one more review matters most</h2>
+{% if not contested_run %}
+<p>Run calibration first. Then this lists the projects that could finish either side of the prize line, so the next reviews go where they can change who wins.</p>
+{% elif contested %}
+<p>There {{ contested|length|pluralize:"is,are" }} {{ contested|length }} project{{ contested|length|pluralize }} whose plausible rank crosses the top {{ line }} (the number of prizes, or three).
+  Spreading reviews evenly spends most of them on projects that can't win and can't miss; these are the ones where another opinion can change the result.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Project</th><th class="num">Rank</th><th class="num">Could be</th><th class="num">Reviews</th></tr></thead>
+  <tbody>{% for r in contested %}<tr><td>{{ r.project.title }}</td><td class="num">{{ r.rank }}</td><td class="num">{{ r.rank_low }} to {{ r.rank_high }}</td><td class="num">{{ r.n_reviews }}</td></tr>{% endfor %}</tbody>
+</table></div>
+<form method="post">{% csrf_token %}<input type="hidden" name="focus" value="podium"><button class="quiet">Give each of these one more review</button></form>
+{% else %}
+<p class="flag good">The top {{ line }} is settled: no project's plausible range crosses the prize line.</p>
+{% endif %}
+
 {% if short %}
   <h2>Can't be filled</h2>
   <p>These projects don't have enough eligible judges left. Invite judges for their track, or widen someone's tracks.</p>

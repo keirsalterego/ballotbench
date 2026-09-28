@@ -1,0 +1,85 @@
+{% extends "portal/base.html" %}
+{% block title %}Manage {{ event.name }}{% endblock %}
+{% block content %}
+<h1>{{ event.name }}</h1>
+{% include "portal/organizer/_nav.html" %}
+
+<h2>Dates and settings</h2>
+<form method="post" class="stack">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}<label>{{ field.label }} {{ field }} {% if field.help_text %}<span class="muted">{{ field.help_text }}</span>{% endif %} {{ field.errors }}</label>{% endfor %}
+  <p class="muted">Times are UTC. Moving the submission close changes what the database accepts immediately.</p>
+  <button>Save</button>
+</form>
+
+<h2>Tracks</h2>
+<ul>{% for t in tracks %}<li>{{ t.name }}
+  <form method="post" action="{% url 'track-delete' event.slug t.pk %}" style="display:inline">{% csrf_token %}<button class="link">delete</button></form></li>{% endfor %}</ul>
+<form method="post" action="{% url 'track-add' event.slug %}" class="filters">{% csrf_token %}
+  <input name="name" placeholder="Track name" required aria-label="Track name"><button>Add track</button></form>
+
+<h2>Prizes</h2>
+<ul>{% for p in prizes %}<li>{{ p.name }}{% if p.track %} <span class="muted">({{ p.track.name }})</span>{% endif %} {{ p.description }}
+  <form method="post" action="{% url 'prize-delete' event.slug p.pk %}" style="display:inline">{% csrf_token %}<button class="link">delete</button></form></li>{% endfor %}</ul>
+<form method="post" action="{% url 'prize-add' event.slug %}" class="filters">{% csrf_token %}
+  <input name="name" placeholder="Prize" required aria-label="Prize name">
+  <input name="description" placeholder="Description" aria-label="Prize description">
+  <select name="track" aria-label="Track"><option value="">Any track</option>{% for t in tracks %}<option value="{{ t.pk }}">{{ t.name }}</option>{% endfor %}</select>
+  <button>Add prize</button></form>
+
+<h2>Rubric</h2>
+{% if frozen %}<p class="badge warn">Frozen: this event already has scores, so criteria, weights and ranges can't change.</p>{% endif %}
+<div class="table-wrap"><table>
+  <tr><th>Key</th><th>Name</th><th class="num">Weight</th><th class="num">Min</th><th class="num">Max</th><th class="num">Order</th><th></th></tr>
+  {% for c in criteria %}
+  <tr><form method="post" action="{% url 'criterion-save' event.slug c.pk %}">{% csrf_token %}
+    <td><input name="key" value="{{ c.key }}" size="12" aria-label="key"{% if frozen %} disabled{% endif %}></td>
+    <td><input name="name" value="{{ c.name }}" size="16" aria-label="name"{% if frozen %} disabled{% endif %}></td>
+    <td class="num"><input name="weight" value="{{ c.weight }}" size="5" aria-label="weight"{% if frozen %} disabled{% endif %}></td>
+    <td class="num"><input name="min_value" value="{{ c.min_value }}" size="3" aria-label="min"{% if frozen %} disabled{% endif %}></td>
+    <td class="num"><input name="max_value" value="{{ c.max_value }}" size="3" aria-label="max"{% if frozen %} disabled{% endif %}></td>
+    <td class="num"><input name="position" value="{{ c.position }}" size="3" aria-label="order"{% if frozen %} disabled{% endif %}></td>
+    <td>{% if not frozen %}<button>Save</button>{% endif %}</td>
+  </form></tr>
+  {% endfor %}
+  {% if not frozen %}
+  <tr><form method="post" action="{% url 'criterion-add' event.slug %}">{% csrf_token %}
+    <td><input name="key" placeholder="key" size="12" required aria-label="new key"></td>
+    <td><input name="name" placeholder="Name" size="16" required aria-label="new name"></td>
+    <td class="num"><input name="weight" value="1" size="5" aria-label="new weight"></td>
+    <td class="num"><input name="min_value" value="1" size="3" aria-label="new min"></td>
+    <td class="num"><input name="max_value" value="5" size="3" aria-label="new max"></td>
+    <td class="num"><input name="position" value="{{ criteria|length }}" size="3" aria-label="new order"></td>
+    <td><button>Add</button></td>
+  </form></tr>
+  {% endif %}
+</table></div>
+<p class="muted">A review's score is the weighted mean of its criteria, each scaled to 0..1 by its own range.</p>
+
+<h2>Judges</h2>
+<div class="table-wrap"><table>
+  <tr><th>Judge</th><th>Tracks (empty = any)</th></tr>
+  {% for j in judges %}
+  <tr><td>{{ j.user.name|default:j.user.email }} <span class="muted">{{ j.external_id|default:"" }}</span></td>
+    <td><form method="post" action="{% url 'judge-tracks' event.slug j.pk %}" class="filters">{% csrf_token %}
+      {% for t in tracks %}<label><input type="checkbox" name="tracks" value="{{ t.pk }}"{% if t in j.tracks.all %} checked{% endif %}> {{ t.name }}</label>{% endfor %}
+      <button class="link">save</button></form></td></tr>
+  {% empty %}<tr><td colspan="2" class="muted">No judges yet. Invite some below.</td></tr>
+  {% endfor %}
+</table></div>
+
+<h2>Invite judges and organizers</h2>
+{% if new_link %}<p><strong>Invitation link, shown once:</strong></p><pre>{{ new_link }}</pre>
+<p class="muted">Single use, valid 7 days. Send it however you like; the portal sends no email.</p>{% endif %}
+<form method="post" action="{% url 'role-invite' event.slug %}" class="filters">{% csrf_token %}
+  <select name="role" aria-label="Role"><option value="judge">Judge</option><option value="organizer">Organizer</option></select>
+  <input name="note" placeholder="Who it's for" aria-label="Note">
+  {% for t in tracks %}<label><input type="checkbox" name="tracks" value="{{ t.pk }}"> {{ t.name }}</label>{% endfor %}
+  <button>Make link</button></form>
+{% if invites %}<ul>{% for i in invites %}<li>{{ i.role }}{% if i.note %}: {{ i.note }}{% endif %}, expires {{ i.expires_at|date:"j M H:i" }}
+  <form method="post" action="{% url 'role-invite-revoke' event.slug i.pk %}" style="display:inline">{% csrf_token %}<button class="link">revoke</button></form></li>{% endfor %}</ul>{% endif %}
+
+<h2>Organizers</h2>
+<ul>{% for o in organizers %}<li>{{ o.user.email }}</li>{% endfor %}</ul>
+{% endblock %}

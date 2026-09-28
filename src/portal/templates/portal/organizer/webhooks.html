@@ -1,0 +1,60 @@
+{% extends "portal/base.html" %}
+{% block title %}Webhooks{% endblock %}
+{% block content %}
+<h1>Webhooks</h1>
+{% include "portal/organizer/_nav.html" %}
+<p>Every change in this event, the same ones the audit log records, sent as a JSON POST to a URL of yours. Changes are queued in the same transaction as the change itself, so nothing is announced that didn't happen, and a delivery that fails is retried for about an hour.</p>
+
+{% if new_secret %}
+<div class="sheet">
+  <p><strong>Signing secret, shown once:</strong></p>
+  <pre>{{ new_secret }}</pre>
+  <p>Each request carries <code>X-Ballotbench-Signature: sha256=&lt;hex&gt;</code>, the HMAC-SHA256 of the raw body with this secret. Check it before trusting the body, comparing in constant time:</p>
+  <pre>expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+hmac.compare_digest(expected, request.headers["X-Ballotbench-Signature"])</pre>
+</div>
+{% endif %}
+
+<h2>Endpoints</h2>
+{% if hooks %}
+<div class="table-wrap"><table>
+  <thead><tr><th>URL</th><th>Changes</th><th>State</th><th></th></tr></thead>
+  <tbody>{% for h in hooks %}
+  <tr>
+    <td><code>{{ h.url }}</code></td>
+    <td>{{ h.actions|join:", "|default:"every change" }}</td>
+    <td>{% if h.active %}<span class="badge ok">sending</span>{% else %}<span class="flag">paused</span>{% endif %}</td>
+    <td><form method="post" action="{% url 'webhook-toggle' event.slug h.pk %}" class="inline">{% csrf_token %}<button class="link">{% if h.active %}pause{% else %}resume{% endif %}</button></form>
+      <form method="post" action="{% url 'webhook-delete' event.slug h.pk %}" class="inline">{% csrf_token %}<button class="link">delete</button></form></td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+{% else %}
+<p class="faint">None yet.</p>
+{% endif %}
+
+<h3>Add an endpoint</h3>
+<form method="post" class="stack">{% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}<label>{{ field.label }} {{ field }} {% if field.help_text %}<span class="muted">{{ field.help_text }}</span>{% endif %} {{ field.errors }}</label>{% endfor %}
+  <p class="muted">The URL must be public: the portal refuses addresses on its own network, and follows no redirects.</p>
+  <div class="actions"><button>Add endpoint</button></div>
+</form>
+
+<h2>Recent deliveries</h2>
+{% if deliveries %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Queued (UTC)</th><th>Change</th><th>To</th><th>State</th><th class="num">Tries</th><th>Last problem</th></tr></thead>
+  <tbody>{% for d in deliveries %}
+  <tr>
+    <td>{{ d.created_at|date:"j M H:i:s" }}</td>
+    <td>{{ d.action }}</td>
+    <td><code>{{ d.webhook.url|truncatechars:48 }}</code></td>
+    <td>{% if d.status == "delivered" %}<span class="badge ok">delivered</span>{% elif d.status == "failed" %}<span class="flag bad">gave up</span>{% else %}waiting{% if d.attempts %}, next try {{ d.next_attempt_at|date:"H:i:s" }}{% endif %}{% endif %}</td>
+    <td class="num">{{ d.attempts }}</td>
+    <td>{{ d.last_error|default:"" }}</td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+{% else %}
+<p class="faint">Nothing sent yet.</p>
+{% endif %}
+{% endblock %}

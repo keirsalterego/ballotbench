@@ -111,6 +111,14 @@ if env("DJANGO_SECURE") == "1":
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
     CSRF_TRUSTED_ORIGINS = [f"https://{h}" for h in ALLOWED_HOSTS if h and not h.startswith("[")]
 
+# The Ed25519 key that signs participation records, made on first use. In
+# Docker it lives on the data volume; in development, in the ignored data/.
+SIGNING_KEY_FILE = env("BALLOTBENCH_SIGNING_KEY_FILE", str(BASE_DIR.parent / "data" / "signing_key.pem"))
+
+# Webhooks go only to public addresses, unless this is 1 (say, for a receiver
+# on the same private network). See portal/webhooks.py.
+WEBHOOKS_ALLOW_PRIVATE = env("BALLOTBENCH_WEBHOOKS_ALLOW_PRIVATE") == "1"
+
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"

@@ -1,4 +1,5 @@
 Django==5.2.17
+cryptography==50.0.1
 djangorestframework==3.18.1
 drf-spectacular==0.30.0
 psycopg[binary]==3.3.6

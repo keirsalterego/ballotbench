@@ -131,3 +131,32 @@ The same everywhere, pages and API:
 - **Single process.** gunicorn with three workers, no background worker.
   Nothing in the portal is slow enough to need one; calibration runs inside
   the organizer's request.
+
+## Beyond T2 (tier T4)
+
+| Module | What it does |
+|-|-|
+| `signing.py` | the Ed25519 key (one file, made on first use with mode 0600), canonical JSON, sign and verify; a pure module |
+| `records.py` | signed participation records for judges and participants, `/verify`, the public key, certificates |
+| `embed.py` | the frameable gallery `/embed/<slug>` and `/embed.js` |
+| `bundles.py`, `commands/export_event`, `commands/import_event` | whole-event bundles out, and in as a new event through `importer.py` |
+| `webhooks.py`, `commands/deliver_webhooks` | the outbox sender, the address checks, the organizer's page |
+
+- **Records are checkable without us.** What's signed is the record's
+  canonical JSON (sorted keys, no spaces, UTF-8), so the Python snippet on
+  `/verify` checks one with nothing but the public key. A record never holds
+  a score: judges' scores stay private even from the people they judged.
+- **Framing is opt-in per view.** `X_FRAME_OPTIONS = "DENY"` stays the
+  default; only the two embed views are exempt, and the embed renders as an
+  anonymous visitor whatever cookies arrive, so it can't leak a draft into
+  someone else's page. The iframe reports its height with `postMessage`, and
+  `embed.js` accepts it only from that iframe and the portal's origin.
+- **Webhooks are the one background worker.** `audit.record` queues a
+  `WebhookDelivery` next to the audit row, in the same transaction, so the
+  outbox and the log can't disagree. A separate `webhooks` service (same
+  image) sends them, taking row locks with `SKIP LOCKED` so two senders never
+  send the same one. The web process never makes an outbound request.
+- **SSRF.** A webhook URL must resolve only to public addresses, when it's
+  saved and again at every send, and the connection goes to the address that
+  was checked (no second DNS lookup to rebind), with a 5 s timeout and no
+  redirects.

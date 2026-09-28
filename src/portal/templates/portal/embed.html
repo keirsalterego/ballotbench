@@ -1,0 +1,59 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ event.name }} projects | ballotbench</title>
+<link rel="stylesheet" href="{% static 'portal/site.css' %}">
+<base target="_blank">
+</head>
+<body class="embed">
+<main>
+<h1>{{ event.name }}</h1>
+{% if results %}
+<h2>Results</h2>
+<ol class="docket ranked">
+{% for r in results %}
+  <li>
+    <h3>{{ r.rank }}. <a href="{% url 'project' r.project_id %}">{{ r.project.title }}</a></h3>
+    <p class="by">by {{ r.project.team.name }}</p>
+  </li>
+{% endfor %}
+</ol>
+<p><a href="{% url 'results' event.slug %}">All results and how they were calibrated</a></p>
+<h2>Every project</h2>
+{% endif %}
+<p class="count">{{ total }} submitted project{{ total|pluralize }}</p>
+{% if projects %}
+<ol class="docket">
+{% for p in projects %}
+  <li>
+    <h3><a href="{% url 'project' p.pk %}">{{ p.title }}</a></h3>
+    <p class="by">by {{ p.team.name }}{% if p.track %}, in {{ p.track.name }}{% endif %}</p>
+    {% if p.tagline or p.summary %}<p>{{ p.tagline|default:p.summary|truncatechars:120 }}</p>{% endif %}
+  </li>
+{% endfor %}
+</ol>
+{% if total > projects|length %}<p><a href="{% url 'gallery' %}?event={{ event.slug }}">See all {{ total }} projects</a></p>{% endif %}
+{% else %}
+<p>No projects have been submitted yet.</p>
+{% endif %}
+<p class="faint">Shown by <a href="{% url 'gallery' %}">ballotbench</a>.</p>
+</main>
+<script>
+(function () {
+  if (window.parent === window) return;
+  var last = 0;
+  function send() {
+    var height = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    if (height !== last) {
+      last = height;
+      window.parent.postMessage({type: "ballotbench:height", height: height}, "*");
+    }
+  }
+  window.addEventListener("load", send);
+  if (window.ResizeObserver) new ResizeObserver(send).observe(document.documentElement);
+})();
+</script>
+</body>
+</html>

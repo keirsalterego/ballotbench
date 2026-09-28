@@ -2,8 +2,8 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
-from . import (api, apidocs, comments, explain, exports, judge, organizer, oversight, participant, progress, results,
-               tokens, views, voting)
+from . import (api, apidocs, bundles, comments, embed, explain, exports, judge, organizer, oversight, participant,
+               progress, records, results, tokens, views, voting, webhooks)
 
 urlpatterns = [
     path("", views.gallery),
@@ -64,6 +64,7 @@ urlpatterns = [
     path("api/schema", SpectacularAPIView.as_view(), name="api-schema"),
     path("api/docs", apidocs.api_docs, name="api-docs"),
     path("api/events", api.events, name="api-events"),
+    path("api/events/import", bundles.import_bundle_view, name="api-import-bundle"),   # before <slug>
     path("api/events/<slug:slug>", api.event_detail, name="api-event"),
     path("api/events/<slug:slug>/projects", api.event_projects, name="api-event-projects"),
     path("api/events/<slug:slug>/export/<slug:kind>.csv", exports.export_csv, name="api-export"),
@@ -74,4 +75,18 @@ urlpatterns = [
     path("api/judge/scores", api.judge_scores, name="api-judge-scores"),
     path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),
     path("api/judge/assignments/<int:pk>/review", judge.api_review, name="api-judge-review"),
+
+    # Tier T4: signed records, certificates, the embeddable gallery, event bundles, webhooks.
+    path("events/<slug:slug>/certificate", records.certificate, name="certificate"),
+    path("verify", records.verify_page, name="verify"),
+    path(".well-known/ballotbench-signing-key", records.signing_key, name="signing-key"),
+    path("api/verify", records.api_verify, name="api-verify"),
+    path("api/judge/record", records.api_judge_record, name="api-judge-record"),
+    path("api/participant/record", records.api_participant_record, name="api-participant-record"),
+    path("embed/<slug:slug>", embed.embed, name="embed"),
+    path("embed.js", embed.embed_js, name="embed-js"),
+    path("api/events/<slug:slug>/export/bundle.json", bundles.export_bundle_view, name="api-export-bundle"),
+    path("events/<slug:slug>/manage/webhooks", webhooks.webhooks_page, name="webhooks"),
+    path("events/<slug:slug>/manage/webhooks/<int:pk>/toggle", webhooks.toggle_webhook, name="webhook-toggle"),
+    path("events/<slug:slug>/manage/webhooks/<int:pk>/delete", webhooks.delete_webhook, name="webhook-delete"),
 ]

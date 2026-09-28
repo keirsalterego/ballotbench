@@ -1,6 +1,7 @@
 """manage.py deliver_webhooks [--once]: send queued webhook deliveries,
 forever (the compose file runs it as its own service) or just once. If the
-database goes away it exits, and compose starts it again."""
+database goes away it exits, and compose starts it again; what it had claimed
+but not sent is due again once its lease runs out (webhooks.LEASE)."""
 import time
 
 from django.core.management.base import BaseCommand

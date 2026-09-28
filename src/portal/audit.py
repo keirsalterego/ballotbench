@@ -57,9 +57,22 @@ def record(action, *, request=None, actor=None, event=None, obj=None, before=Non
 
 
 def _enqueue(row, event):
-    # ponytail: one query per audited change to find the event's webhooks;
-    # cache them per request if an event ever has thousands of changes a second.
-    hooks = [h for h in Webhook.objects.filter(event=event, active=True) if h.wants(row.action)]
+    """A webhook sends what its creator could see as an organizer, so one
+    whose creator no longer organizes the event (and isn't staff) is paused
+    here instead of sending on: removing someone from an event also has to
+    stop the scores flowing to their URL."""
+    from .access import is_organizer
+
+    # ponytail: a query for the event's webhooks and one per webhook for its
+    # creator's role, per audited change; cache per request if that ever shows.
+    hooks = list(Webhook.objects.filter(event=event, active=True).select_related("created_by"))
+    orphans = [h for h in hooks if not (h.created_by and is_organizer(h.created_by, event))]
+    if orphans:
+        Webhook.objects.filter(pk__in=[h.pk for h in orphans]).update(active=False)
+        for hook in orphans:
+            record("webhook.pause", event=event, obj=hook,
+                   after={"url": hook.url, "reason": "creator no longer organizes this event"})
+    hooks = [h for h in hooks if h not in orphans and h.wants(row.action)]
     if not hooks:
         return
     payload = _plain({"id": row.pk, "action": row.action, "event": event.slug, "at": row.ts,

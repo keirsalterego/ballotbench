@@ -2,19 +2,22 @@
 only to public addresses, retried with backoff, managed by organizers only."""
 import hashlib
 import hmac
+import ipaddress
 import json
 import socket
 import threading
+import time
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 from django.core.management import call_command
 from django.db import transaction
+from django.test import Client, override_settings
 
 from portal import audit, webhooks
 from portal.access import db_now
-from portal.models import Event, Webhook, WebhookDelivery
+from portal.models import AuditLog, Event, Membership, User, Webhook, WebhookDelivery
 
 from .conftest import EMAILS, EVENT
 
@@ -28,8 +31,14 @@ def event():
 
 
 @pytest.fixture
-def hook(event):
-    return Webhook.objects.create(event=event, url="https://hooks.example.org/in", secret="s3cret")
+def organizer():
+    return User.objects.get(email=EMAILS["organizer"])
+
+
+@pytest.fixture
+def hook(event, organizer):
+    return Webhook.objects.create(event=event, url="https://hooks.example.org/in", secret="s3cret",
+                                  created_by=organizer)
 
 
 @pytest.fixture
@@ -52,9 +61,11 @@ def test_a_change_queues_a_delivery(web, hook):
     assert delivery.payload["after"] == {"name": "Robotics"} and delivery.payload["actor"] == EMAILS["organizer"]
 
 
-def test_filter_and_pause(web, event, hook):
-    reviews_only = Webhook.objects.create(event=event, url="https://x.example.org/", secret="x", actions=["review"])
-    paused = Webhook.objects.create(event=event, url="https://y.example.org/", secret="y", active=False)
+def test_filter_and_pause(web, event, hook, organizer):
+    reviews_only = Webhook.objects.create(event=event, url="https://x.example.org/", secret="x", actions=["review"],
+                                          created_by=organizer)
+    paused = Webhook.objects.create(event=event, url="https://y.example.org/", secret="y", active=False,
+                                    created_by=organizer)
     web("organizer").post(f"/events/{EVENT}/manage/tracks", {"name": "Space"})
     assert WebhookDelivery.objects.filter(webhook=hook).count() == 1
     assert not WebhookDelivery.objects.filter(webhook__in=[reviews_only, paused]).exists()
@@ -88,10 +99,20 @@ def test_signature_verifies(event, hook):
 @pytest.mark.parametrize("url", ["http://127.0.0.1/", "http://localhost/", "http://10.1.2.3/x", "http://192.168.0.1/",
                                  "http://169.254.169.254/latest/meta-data", "http://[::1]/", "http://[fe80::1]/",
                                  "http://[::ffff:127.0.0.1]/", "http://100.64.0.1/", "http://0.0.0.0/",
-                                 "ftp://example.org/", "file:///etc/passwd", "http:///nohost"])
+                                 "ftp://example.org/", "file:///etc/passwd", "http:///nohost",
+                                 # IPv6 spellings of IPv4 addresses, and site-local IPv6
+                                 "http://[::7f00:1]/", "http://[::ffff:0:7f00:1]/", "http://[64:ff9b::a00:1]/",
+                                 "http://[64:ff9b::a9fe:a9fe]/", "http://[fec0::1]/"])
 def test_private_and_odd_urls_are_refused(url):
     with pytest.raises(webhooks.Refused):
         webhooks.resolve(url)
+
+
+def test_an_ipv4_inside_ipv6_is_judged_by_the_ipv4():
+    """NAT64 to a public address is fine; it's where the packet goes."""
+    assert webhooks.public(ipaddress.ip_address("64:ff9b::5db8:d822"))          # 93.184.216.34
+    assert webhooks.public(ipaddress.ip_address("2606:4700::1111"))
+    assert not webhooks.public(ipaddress.ip_address("::ffff:0:0"))
 
 
 def test_a_name_that_resolves_privately_is_refused(dns):
@@ -149,7 +170,7 @@ def test_only_due_deliveries_are_sent(event, hook):
     assert WebhookDelivery.objects.get().status == "delivered" and len(calls) == 2
 
 
-def test_real_delivery_over_http(settings, event):
+def test_real_delivery_over_http(settings, event, organizer):
     """End to end on loopback: the command POSTs, the receiver checks the
     signature. Needs ALLOW_PRIVATE, as any receiver on this machine would."""
     settings.WEBHOOKS_ALLOW_PRIVATE = True
@@ -167,7 +188,7 @@ def test_real_delivery_over_http(settings, event):
 
     server = HTTPServer(("127.0.0.1", 0), Receiver)
     threading.Thread(target=server.handle_request, daemon=True).start()
-    Webhook.objects.create(event=event, url=f"http://127.0.0.1:{server.server_port}/hook", secret="k")
+    Webhook.objects.create(event=event, url=f"http://127.0.0.1:{server.server_port}/hook", secret="k", created_by=organizer)
     audit.record("results.publish", event=event, obj=event)
     call_command("deliver_webhooks", "--once", stdout=open("/dev/null", "w"))
     server.server_close()
@@ -175,7 +196,7 @@ def test_real_delivery_over_http(settings, event):
     assert WebhookDelivery.objects.get().status == "delivered"
 
 
-def test_redirects_are_not_followed(settings, event):
+def test_redirects_are_not_followed(settings, event, organizer):
     settings.WEBHOOKS_ALLOW_PRIVATE = True
 
     class Redirect(BaseHTTPRequestHandler):
@@ -189,7 +210,7 @@ def test_redirects_are_not_followed(settings, event):
 
     server = HTTPServer(("127.0.0.1", 0), Redirect)
     threading.Thread(target=server.handle_request, daemon=True).start()
-    Webhook.objects.create(event=event, url=f"http://127.0.0.1:{server.server_port}/", secret="k")
+    Webhook.objects.create(event=event, url=f"http://127.0.0.1:{server.server_port}/", secret="k", created_by=organizer)
     audit.record("results.publish", event=event, obj=event)
     webhooks.deliver_due()
     server.server_close()
@@ -217,3 +238,130 @@ def test_organizers_only(web, api, event, hook, dns):
     assert made.secret not in json.dumps(list(audit.AuditLog.objects.filter(action="webhook.create").values("after")))
     organizer.post(f"{PAGE}/{hook.pk}/delete")
     assert not Webhook.objects.filter(pk=hook.pk).exists()
+
+
+@pytest.fixture
+def raw_receiver():
+    """raw_receiver(answer) is the URL of a one-shot receiver on loopback that
+    reads the request, then calls answer(send), send(bytes) writing to it."""
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def start(answer):
+        def serve():
+            try:
+                conn, _ = listener.accept()
+                with conn:
+                    conn.recv(65536)
+                    answer(conn.sendall)
+            except OSError:
+                pass                    # the sender hung up, as it should
+        threading.Thread(target=serve, daemon=True).start()
+        return f"http://127.0.0.1:{listener.getsockname()[1]}/"
+    yield start
+    listener.close()
+
+
+def drip(data, every):
+    def answer(send):
+        for byte in data:
+            time.sleep(every)
+            send(bytes([byte]))
+    return answer
+
+
+@pytest.mark.parametrize("answer, error", [
+    pytest.param(drip(b"HTTP/1.1 200 OK\r\n\r\n", every=0.3), "TimeoutError", id="slow-status-line"),
+    pytest.param(lambda send: (send(b"HTTP/1.1 200 OK\r\n"), drip(b"X-Slow: y\r\n\r\n", every=0.3)(send)), "",
+                 id="slow-headers"),
+    pytest.param(lambda send: send(b"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n"), "",
+                 id="interim-answer"),
+    pytest.param(lambda send: send(b"x" * 100_000), "HTTPException: no status line", id="endless-head"),
+])
+def test_an_attempt_has_one_deadline_and_reads_only_the_head(settings, event, monkeypatch, raw_receiver,
+                                                              answer, error):
+    """A socket timeout counts each read afresh, so a receiver dripping a byte
+    at a time within it could hold the one sender for ever."""
+    settings.WEBHOOKS_ALLOW_PRIVATE = True
+    monkeypatch.setattr(webhooks, "TIMEOUT", 2)
+    hook = Webhook.objects.create(event=event, url=raw_receiver(answer), secret="k")
+    delivery = WebhookDelivery.objects.create(webhook=hook, action="x", payload={})
+    started = time.monotonic()
+    assert webhooks.attempt(delivery) == (not error)
+    assert time.monotonic() - started < webhooks.TIMEOUT + 1
+    delivery.refresh_from_db()
+    assert delivery.last_error.startswith(error)
+
+
+def test_a_slow_receiver_holds_up_no_other(event, hook):
+    """Sends go out together, one per webhook a round: the slow one here only
+    answers once the other has been sent, which it couldn't if they queued."""
+    other = Webhook.objects.create(event=event, url="https://other.example.org/", secret="o")
+    for _ in range(3):
+        WebhookDelivery.objects.create(webhook=hook, action="x", payload={})
+    WebhookDelivery.objects.create(webhook=other, action="x", payload={})
+    other_sent = threading.Event()
+
+    def send(url, body, headers):
+        if url == other.url:
+            other_sent.set()
+            return 200
+        return 200 if other_sent.wait(timeout=3) else 504
+    started = time.monotonic()
+    assert webhooks.deliver_due(send) == 4
+    assert time.monotonic() - started < 2
+    assert set(WebhookDelivery.objects.values_list("status", flat=True)) == {"delivered"}
+
+
+def test_a_sender_that_dies_mid_send_leaves_a_lease(event, hook):
+    """The claim is committed before the send, not held open across it; if the
+    sender dies, the delivery waits out the lease and is sent again."""
+    WebhookDelivery.objects.create(webhook=hook, action="x", payload={})
+
+    def crash(*args):
+        raise RuntimeError("worker killed")
+    with pytest.raises(RuntimeError):
+        webhooks.deliver_due(crash)
+    delivery = WebhookDelivery.objects.get()
+    assert delivery.status == "pending" and delivery.attempts == 0
+    assert delivery.next_attempt_at - db_now() > timedelta(minutes=1)
+    assert webhooks.deliver_due(lambda *a: 200) == 0                          # still leased
+    WebhookDelivery.objects.update(next_attempt_at=db_now())
+    assert webhooks.deliver_due(lambda *a: 200) == 1
+    assert WebhookDelivery.objects.get().status == "delivered"
+
+
+def test_a_webhook_stops_when_its_creator_stops_organizing(api, web, event):
+    """It carries scores and reviews; once its creator is no longer an
+    organizer of the event, it pauses (audited) instead of sending them on."""
+    ex = User.objects.create_user("ex-organizer@example.org", "x")
+    membership = Membership.objects.create(user=ex, event=event, role="organizer")
+    client = Client()
+    client.force_login(ex)
+    with override_settings(WEBHOOKS_ALLOW_PRIVATE=True):
+        client.post(PAGE, {"url": "http://127.0.0.1:9/hook", "actions": "review"})
+    hook = Webhook.objects.get(event=event, created_by=ex)
+    membership.delete()
+    assignment = api("judge_a").get("/api/judge/assignments").json()[0]
+    Event.objects.filter(pk=event.pk).update(judging_close=None)
+    scores = {c["key"]: 3 for c in Client().get(f"/api/events/{EVENT}").json()["criteria"]}
+    api("judge_a").post(f"/api/judge/assignments/{assignment['id']}/review", {"scores": scores},
+                        content_type="application/json")
+    assert not WebhookDelivery.objects.filter(webhook=hook).exists()
+    hook.refresh_from_db()
+    assert hook.active is False
+    paused = AuditLog.objects.get(action="webhook.pause", object_id=str(hook.pk))
+    assert paused.actor is None and paused.after["reason"] == "creator no longer organizes this event"
+    # An organizer who resumes it takes it over, and it sends again.
+    web("organizer").post(f"{PAGE}/{hook.pk}/toggle")
+    hook.refresh_from_db()
+    assert hook.active and hook.created_by.email == EMAILS["organizer"]
+    audit.record("review.submit", event=event, obj=event)
+    assert WebhookDelivery.objects.filter(webhook=hook).exists()
+
+
+def test_a_staff_creator_keeps_sending(event):
+    admin = User.objects.get(email=EMAILS["admin"])
+    assert admin.is_staff and not Membership.objects.filter(user=admin, event=event).exists()
+    hook = Webhook.objects.create(event=event, url="https://hooks.example.org/in", secret="k", created_by=admin)
+    audit.record("track.create", event=event, obj=event)
+    assert WebhookDelivery.objects.filter(webhook=hook).exists()

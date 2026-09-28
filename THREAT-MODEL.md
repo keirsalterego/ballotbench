@@ -175,17 +175,38 @@ and what doesn't stop it.
 ### Webhooks as a way into the private network
 
 - **Stops it:** a webhook URL must be http(s) and every address its name
-  resolves to must be public (`webhooks.resolve`: `is_global`, not
-  multicast). That's checked when the organizer saves it and again right
+  resolves to must be public (`webhooks.public`: `is_global`, not
+  multicast, not site-local `fec0::/10`; an IPv6 address carrying an IPv4
+  one, mapped, compatible, translated or NAT64 `64:ff9b::/96`, is judged by
+  the IPv4 one). That's checked when the organizer saves it and again right
   before each send, and the connection goes to the address that was checked,
   so a DNS answer that changes between the check and the request (DNS
-  rebinding) can't redirect it. Redirects aren't followed, the timeout is
-  5 seconds, and each delivery is signed with HMAC-SHA256 so the receiver
-  can tell it's from this portal.
+  rebinding) can't redirect it. Redirects aren't followed, and each delivery
+  is signed with HMAC-SHA256 so the receiver can tell it's from this portal.
 - **Doesn't stop it:** an organizer choosing to deliver to their own network
   with `BALLOTBENCH_WEBHOOKS_ALLOW_PRIVATE=1`. Webhook payloads carry what the
   audit log carries for that event, so a webhook URL is a copy of the log:
-  only organizers can add one, and adding one is itself audited.
+  only organizers can add one, and adding one is itself audited. It keeps
+  sending only while the organizer who added it (or who last resumed it)
+  still organizes the event or is staff; otherwise the next change pauses it,
+  with a `webhook.pause` audit row saying why.
+
+### A webhook receiver holding up the sender
+
+- **Stops it:** one deadline of 10 seconds per attempt, for connecting,
+  sending and reading the answer together (a socket timeout alone counts
+  each read afresh, so a receiver sending a byte every few seconds could
+  hold the sender for ever). Only the status line is read, at most 16 KiB
+  looking for it, and never the body. Sends happen with no transaction or
+  row lock held: the sender claims a round of due deliveries, one per
+  webhook, by moving each `next_attempt_at` a lease (2 minutes) ahead under
+  `SKIP LOCKED`, commits, sends them all at once, then records each result.
+  A sender that dies mid-send leaves its deliveries due again when the lease
+  runs out.
+- **Doesn't stop it:** a slow receiver still delays the other webhooks'
+  deliveries by up to one deadline per round, since a round waits for its
+  slowest send. The DNS lookup before each send isn't under the deadline;
+  the system resolver's own timeouts bound it.
 
 ### The embed as a window in
 

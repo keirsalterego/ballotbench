@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Webhooks</h1>
 {% include "portal/organizer/_nav.html" %}
-<p>Every change in this event, the same ones the audit log records, sent as a JSON POST to a URL of yours. Changes are queued in the same transaction as the change itself, so nothing is announced that didn't happen, and a delivery that fails is retried for about an hour.</p>
+<p>Every change in this event, the same ones the audit log records, sent as a JSON POST to a URL of yours. Changes are queued in the same transaction as the change itself, so nothing is announced that didn't happen, and a delivery that fails is retried for about an hour. An endpoint sends on behalf of the organizer who added it: if they stop organizing this event it pauses itself, and whoever resumes it takes it over.</p>
 
 {% if new_secret %}
 <div class="sheet">

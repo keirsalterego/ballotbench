@@ -1,6 +1,8 @@
-"""Runs on every boot: import the fixture event, create the open demo event
-and, with BALLOTBENCH_DEMO_SEED=1, the demo accounts with fixed tokens that
-.dogfood.toml and the README use. Safe to run any number of times."""
+"""Runs on every boot. With BALLOTBENCH_DEMO_SEED=1 (the compose default) it
+imports the fixture event, creates the open demo event, and the demo accounts
+with the fixed tokens .dogfood.toml and the README use. With anything else it
+loads nothing at all: a real deployment starts empty and makes its first
+admin with `manage.py createsuperuser`. Safe to run any number of times."""
 import json
 import os
 from datetime import timedelta
@@ -10,6 +12,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
 
 from portal import audit
 from portal.auth import hash_token, issue_token
@@ -38,12 +41,23 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, fixtures, **options):
+        if os.environ.get("BALLOTBENCH_DEMO_SEED") != "1":
+            self.stdout.write("demo seed off (BALLOTBENCH_DEMO_SEED is not 1): nothing loaded. "
+                              "Make the first admin with `manage.py createsuperuser`.")
+            return
         data = json.loads(Path(fixtures).read_text())
-        event, counts = import_event(data, slug=FIXTURE_SLUG)
+        event, counts = import_event(data, slug=self.slug_for(data["event"]))
         self.stdout.write(f"fixture event {event.slug}: " + ", ".join(f"{v} {k}" for k, v in counts.items()))
         demo = self.demo_event(data)
-        if os.environ.get("BALLOTBENCH_DEMO_SEED") == "1":
-            self.demo_accounts(event, demo)
+        self.demo_accounts(event, demo)
+
+    def slug_for(self, ev):
+        """The Dogfood fixture keeps the slug .dogfood.toml points at; any other
+        fixture file gets one from its name, made unique if it's taken."""
+        base = FIXTURE_SLUG if ev["id"] == "evt_01" else slugify(ev["name"])
+        if Event.objects.filter(slug=base).exclude(external_id=ev["id"]).exists():
+            base = f"{base}-{slugify(ev['id'])}"
+        return base
 
     def demo_event(self, data):
         """An empty event that is open now, for trying the whole flow. Created

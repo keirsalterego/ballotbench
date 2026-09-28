@@ -67,3 +67,20 @@ def test_boot_prints_the_logins_in_the_spec_format():
 def test_tokens_are_stored_hashed():
     from portal.models import ApiToken
     assert not ApiToken.objects.filter(token_hash__startswith="bb_").exists()
+
+
+def test_with_demo_seed_off_nothing_is_loaded(monkeypatch):
+    monkeypatch.setenv("BALLOTBENCH_DEMO_SEED", "0")
+    before = counts()
+    out = io.StringIO()
+    call_command("seed", fixtures=str(FIXTURES), stdout=out)
+    assert counts() == before and "nothing loaded" in out.getvalue()
+
+
+def test_another_fixture_file_gets_its_own_slug(tmp_path):
+    other = json.loads(Path(FIXTURES).read_text())
+    other["event"] = {**other["event"], "id": "evt_99", "name": "Sample Hack 2026"}
+    path = tmp_path / "other.json"
+    path.write_text(json.dumps(other))
+    call_command("seed", fixtures=str(path), stdout=io.StringIO())
+    assert Event.objects.filter(external_id="evt_99").exclude(slug="sample-hack-2026").exists()

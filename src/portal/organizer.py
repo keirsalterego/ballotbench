@@ -21,7 +21,7 @@ from .models import Event, Membership, Prize, RoleInvite, RubricCriterion, Track
 
 ROLE_INVITE_LIFETIME = timedelta(days=7)
 EVENT_FIELDS = ["name", "description", "submissions_open", "submissions_close", "judging_open", "judging_close",
-                "voting_open", "voting_close", "reviews_per_project", "max_team_size"]
+                "voting_open", "voting_close", "voting_mode", "vote_credits", "reviews_per_project", "max_team_size"]
 
 
 def organizer_required(view):
@@ -45,12 +45,16 @@ class EventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = ["name", "slug", "description", "submissions_open", "submissions_close", "judging_open",
-                  "judging_close", "voting_open", "voting_close", "reviews_per_project", "max_team_size"]
+                  "judging_close", "voting_open", "voting_close", "voting_mode", "vote_credits", "reviews_per_project",
+                  "max_team_size"]
         widgets = {f: forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
                    for f in ["submissions_open", "submissions_close", "judging_open", "judging_close",
                              "voting_open", "voting_close"]}
         widgets["description"] = forms.Textarea(attrs={"rows": 3})
         help_texts = {"reviews_per_project": "k: how many judges review each project",
+                      "voting_mode": "who may vote in the community vote: nobody, anyone signed in, or anyone "
+                                     "who confirms an email address",
+                      "vote_credits": "each voter's budget: n votes for one project cost n² credits",
                       "slug": "used in URLs; can't be changed later"}
 
     def clean(self):

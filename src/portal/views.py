@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from . import audit
 from .access import visible_projects
@@ -65,7 +66,12 @@ def signup(request):
         audit.record("user.signup", request=request, actor=user, obj=user, after={"email": user.email})
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         messages.success(request, "Welcome. Join an event below, or open an invite link from your team.")
-        return redirect(request.GET.get("next") or "home")
+        target = request.GET.get("next", "")
+        # Only follow `next` to a page on this site, never to another host.
+        if not url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()},
+                                               require_https=request.is_secure()):
+            target = "home"
+        return redirect(target)
     return render(request, "registration/signup.html", {"form": form})
 
 

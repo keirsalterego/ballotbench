@@ -26,6 +26,20 @@ class AuditedAdmin(admin.ModelAdmin):
         for obj in queryset:
             self.delete_model(request, obj)
 
+    def save_formset(self, request, form, formset, change):
+        """Inline rows (an event's tracks and prizes) are changes too."""
+        instances = formset.save(commit=False)
+        for obj in formset.deleted_objects:
+            audit.record("admin.delete", request=request, event=getattr(obj, "event", None), obj=obj,
+                         before={"repr": str(obj)})
+            obj.delete()
+        for obj in instances:
+            is_new = obj.pk is None
+            obj.save()
+            audit.record(f"admin.{'add' if is_new else 'change'}", request=request,
+                         event=getattr(obj, "event", None), obj=obj, after={"repr": str(obj)})
+        formset.save_m2m()
+
 
 @admin.register(User)
 class UserAdmin(AuditedAdmin):

@@ -82,6 +82,9 @@ class Command(BaseCommand):
             names[m.user_id] = m.external_id or m.user.email
         out = self.stdout.write
 
+        if not obs:
+            out(f"Normalization proof: {ev.name} has no submitted reviews yet, so there is nothing to calibrate.")
+            return
         result = fit(obs)
         out(f"Normalization proof: {ev.name}, {len(obs)} reviews, {len(result.judges)} judges, "
             f"{len(result.projects)} projects")
@@ -110,7 +113,13 @@ class Command(BaseCommand):
         for pid, p in dupes.items():
             out(f"Left out of the ranking: {p.external_id} ({p.title}) repeats {p.duplicate_of.external_id}; "
                 f"its {result.projects[pid].n} reviews still count towards calibrating their judges.")
-        ranked = [p for p in result.projects if p not in dupes]
+        # ...and, like the calibration page, projects whose every reviewer the
+        # model ignores: there's nothing to rank them by.
+        unusable = sorted((p for p in result.projects if p not in dupes and result.projects[p].usable == 0), key=str)
+        for pid in unusable:
+            out(f"Left out of the ranking: {titles[pid][0]} ({titles[pid][1]}): all {result.projects[pid].n} of its "
+                f"reviewers carry no weight, so there's nothing to rank it by.")
+        ranked = [p for p in result.projects if p not in dupes and p not in unusable]
         raw_order = sorted(ranked, key=lambda p: (-result.projects[p].raw_mean, p))
         cal_order = sorted(ranked, key=lambda p: (-result.projects[p].quality, -result.projects[p].raw_mean, p))
         raw_rank = {p: i + 1 for i, p in enumerate(raw_order)}

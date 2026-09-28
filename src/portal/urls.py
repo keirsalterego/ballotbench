@@ -3,7 +3,7 @@ from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
 from . import api, apidocs, exports, judge, organizer, oversight, participant, progress, results, views
-from . import embed, records  # tier T4
+from . import bundles, embed, records  # tier T4
 
 urlpatterns = [
     path("", views.gallery),
@@ -54,6 +54,7 @@ urlpatterns = [
     path("api/schema", SpectacularAPIView.as_view(), name="api-schema"),
     path("api/docs", apidocs.api_docs, name="api-docs"),
     path("api/events", api.events, name="api-events"),
+    path("api/events/import", bundles.import_bundle_view, name="api-import-bundle"),   # before <slug>
     path("api/events/<slug:slug>", api.event_detail, name="api-event"),
     path("api/events/<slug:slug>/projects", api.event_projects, name="api-event-projects"),
     path("api/events/<slug:slug>/export/<slug:kind>.csv", exports.export_csv, name="api-export"),
@@ -63,7 +64,7 @@ urlpatterns = [
     path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),
     path("api/judge/assignments/<int:pk>/review", judge.api_review, name="api-judge-review"),
 
-    # Tier T4: signed records, certificates, the embeddable gallery.
+    # Tier T4: signed records, certificates, the embeddable gallery, event bundles.
     path("events/<slug:slug>/certificate", records.certificate, name="certificate"),
     path("verify", records.verify_page, name="verify"),
     path(".well-known/ballotbench-signing-key", records.signing_key, name="signing-key"),
@@ -72,4 +73,5 @@ urlpatterns = [
     path("api/participant/record", records.api_participant_record, name="api-participant-record"),
     path("embed/<slug:slug>", embed.embed, name="embed"),
     path("embed.js", embed.embed_js, name="embed-js"),
+    path("api/events/<slug:slug>/export/bundle.json", bundles.export_bundle_view, name="api-export-bundle"),
 ]

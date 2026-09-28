@@ -10,4 +10,6 @@
   <tr><td><a href="{% url 'api-export' event.slug kind %}">{{ kind }}.csv</a></td><td>{{ what }}</td></tr>
   {% endif %}{% endfor %}</tbody>
 </table></div>
+<h2>The whole event</h2>
+<p><a href="{% url 'api-export-bundle' event.slug %}">bundle.json</a> is everything above in one file: dates, tracks, prizes, the weighted rubric, judges and their tracks, teams, every project with its drafts and duplicate flags, and every review. Bring it back as a new event with <code>POST /api/events/import?slug=new-slug</code> or <code>manage.py import_event bundle.json --slug new-slug</code>.</p>
 {% endblock %}

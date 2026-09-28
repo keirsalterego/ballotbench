@@ -99,6 +99,42 @@ def test_judging_and_voting_cant_open_before_submissions_close():
     assert "judging_open" in form.errors and "voting_open" in form.errors
 
 
+def test_manual_assignment_respects_the_judges_tracks(web, event):
+    judge = Membership.objects.get(event=event, user__email=EMAILS["judge_b"], role="judge")
+    project = Project.objects.filter(event=event, status="submitted", duplicate_of__isnull=True,
+                                     track__isnull=False).exclude(assignments__judge=judge.user).first()
+    other = Track.objects.create(event=event, name="Elsewhere")
+    judge.tracks.set([other])
+    url = f"/events/{EVENT}/manage/assign/manual"
+    response = web("organizer").post(url, {"judge": judge.user_id, "project": project.pk}, follow=True)
+    assert "isn&#x27;t one of" in response.content.decode()
+    assert not JudgeAssignment.objects.filter(judge=judge.user, project=project).exists()
+    web("organizer").post(url, {"judge": judge.user_id, "project": project.pk, "outside_tracks": "1"})
+    a = JudgeAssignment.objects.get(judge=judge.user, project=project)
+    assert AuditLog.objects.get(action="assignment.create", object_id=str(a.pk)).after["outside_tracks"] is True
+
+
+def test_the_podium_line_counts_overall_prizes_only(event):
+    Prize.objects.filter(event=event).delete()
+    Prize.objects.create(event=event, name="Best in track", track=event.tracks.first())
+    assert podium_line(event) == 3
+    Prize.objects.create(event=event, name="First")
+    Prize.objects.create(event=event, name="Second")
+    assert podium_line(event) == 2
+
+
+def test_progress_offers_only_what_the_planner_can_fill(web, event):
+    Event.objects.filter(pk=event.pk).update(reviews_per_project=10)
+    event.refresh_from_db()
+    fillable = len(make_plan(event, 10).new)
+    page = web("organizer").get(f"/events/{EVENT}/manage/progress").content.decode()
+    assert "can't be handed out" in page
+    if fillable:
+        assert f"Hand out {fillable} more" in page
+    else:
+        assert "Hand out" not in page
+
+
 def test_recusal_needs_a_reason(web, event):
     open_judging(event)
     a = JudgeAssignment.objects.filter(event=event, judge__email=EMAILS["judge_a"], status="pending").first()

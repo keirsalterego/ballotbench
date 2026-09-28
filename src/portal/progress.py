@@ -40,8 +40,9 @@ def make_plan(event, k):
 
 
 def podium_line(event):
-    """Where the prizes stop: the number of prizes, or the top three."""
-    return max(1, event.prizes.count() or 3)
+    """Where the prizes stop: the number of overall prizes (a track prize
+    doesn't go to the top of the whole ranking), or the top three."""
+    return event.prizes.filter(track__isnull=True).count() or 3
 
 
 def contested(event):
@@ -121,8 +122,16 @@ def assign(request, event):
 @organizer_required
 @require_POST
 def assign_manual(request, event):
-    project = get_object_or_404(rankable_projects(event), pk=request.POST.get("project") or 0)
-    judge = get_object_or_404(Membership, event=event, role="judge", user_id=request.POST.get("judge") or 0).user
+    project = get_object_or_404(rankable_projects(event).select_related("track"), pk=request.POST.get("project") or 0)
+    membership = get_object_or_404(Membership, event=event, role="judge", user_id=request.POST.get("judge") or 0)
+    judge = membership.user
+    tracks = set(membership.tracks.values_list("pk", flat=True))
+    outside = bool(tracks) and project.track_id not in tracks
+    if outside and not request.POST.get("outside_tracks"):
+        where = project.track.name if project.track else "no track"
+        messages.error(request, f"{project.title} is in {where}, which isn't one of {judge.email}'s tracks. "
+                                "Tick \"outside their tracks\" to give it anyway.")
+        return redirect("progress", slug=event.slug)
     try:
         with guarded():
             a = JudgeAssignment.objects.create(event=event, judge=judge, project=project,
@@ -133,7 +142,7 @@ def assign_manual(request, event):
         messages.error(request, f"{judge.email} already has {project.title}.")
     else:
         audit.record("assignment.create", request=request, event=event, obj=a,
-                     after={"judge": judge.email, "project": project.pk})
+                     after={"judge": judge.email, "project": project.pk, "outside_tracks": outside})
         messages.success(request, f"{project.title} is now with {judge.email}.")
     return redirect("progress", slug=event.slug)
 
@@ -186,6 +195,9 @@ def progress(request, event):
     projects = project_progress(event)
     total = sum(r["assigned"] for r in judges)
     done = sum(r["done"] for r in judges)
+    # Only offer what the planner can actually hand out: a project with no
+    # eligible judge left stays short however often the button is pressed.
+    fill = make_plan(event, event.reviews_per_project)
     pending_assignments = (JudgeAssignment.objects.filter(event=event, status="pending")
                            .select_related("judge", "project").order_by("project__title"))
     return render(request, "portal/organizer/progress.html", {
@@ -193,7 +205,7 @@ def progress(request, event):
         "live": request.GET.get("live") == "1",
         "pct": round(100 * done / total) if total else 0,
         "low": [r for r in projects if r["low"]],
-        "unfilled": sum(r["missing"] for r in projects),
+        "fillable": len(fill.new), "unfillable": sum(fill.short.values()),
         "pending_assignments": pending_assignments,
         "manual_judges": Membership.objects.filter(event=event, role="judge").select_related("user").order_by("user__email"),
         "manual_projects": rankable_projects(event).order_by("title"),

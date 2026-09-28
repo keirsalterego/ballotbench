@@ -151,14 +151,15 @@ and what doesn't stop it.
 
 ### Token and session theft
 
-- **Stops it:** API tokens are random, shown once, stored as SHA-256 and
-  revocable in the admin. Session cookies are HttpOnly and SameSite=Lax,
-  every session POST needs a CSRF token, and pages can't be framed. Login
+- **Stops it:** API tokens are random, shown once, stored as SHA-256, and
+  revocable by their owner at `/me/tokens` (or by an admin). Session cookies
+  are HttpOnly and SameSite=Lax, every session POST needs a CSRF token, and
+  no page can be framed except the read-only embed (below). Login
   attempts are limited to 20 per address per 10 minutes, so a password
   can't be guessed at network speed.
-- **Doesn't stop it:** tokens don't expire, and nothing here sets the
-  `Secure` cookie flag or HSTS: put the portal behind TLS and set those in
-  the proxy or settings. The login limit is per address, so a botnet gets
+- **Doesn't stop it:** tokens don't expire until revoked. Plain HTTP is the
+  default so the laptop demo works; behind TLS, `DJANGO_SECURE=1` turns on
+  secure cookies, HSTS and the redirect to HTTPS. The login limit is per address, so a botnet gets
   20 guesses per address.
 
 ### Flooding
@@ -166,7 +167,44 @@ and what doesn't stop it.
 - **Stops it:** the rate limits above, counted in Postgres
   (`ratelimit.allow`) so every worker shares them. IPv6 is limited per /64,
   because one subscriber usually holds a whole /64.
-- **Doesn't stop it:** a real denial of service. Put a proxy in front. The
-  limits key on the address the audit log records (`audit.client_ip`), so
-  behind a proxy that must be the visitor's address, not the proxy's, or
-  everyone shares one limit.
+- **Doesn't stop it:** a real denial of service. Put a proxy in front, and
+  set `BALLOTBENCH_TRUSTED_PROXIES` to the number of proxies so the limits
+  and the audit log see the visitor's address (read from X-Forwarded-For,
+  counting from the right, so a client can't choose it), not the proxy's.
+
+### Webhooks as a way into the private network
+
+- **Stops it:** a webhook URL must be http(s) and every address its name
+  resolves to must be public (`webhooks.resolve`: `is_global`, not
+  multicast). That's checked when the organizer saves it and again right
+  before each send, and the connection goes to the address that was checked,
+  so a DNS answer that changes between the check and the request (DNS
+  rebinding) can't redirect it. Redirects aren't followed, the timeout is
+  5 seconds, and each delivery is signed with HMAC-SHA256 so the receiver
+  can tell it's from this portal.
+- **Doesn't stop it:** an organizer choosing to deliver to their own network
+  with `BALLOTBENCH_WEBHOOKS_ALLOW_PRIVATE=1`. Webhook payloads carry what the
+  audit log carries for that event, so a webhook URL is a copy of the log:
+  only organizers can add one, and adding one is itself audited.
+
+### The embed as a window in
+
+- **Stops it:** `/embed/<slug>` is the only page any site may frame
+  (`frame-ancestors *`, no X-Frame-Options); everything else is `DENY`. It
+  renders as an anonymous visitor whatever cookie or token comes with the
+  request, so it never shows a draft or unpublished results, and it has no
+  forms, so framing it can't trick anyone into clicking something that
+  changes state.
+- **Doesn't stop it:** someone embedding a public gallery where you'd rather
+  they didn't. It's public anyway.
+
+### Forged records and certificates
+
+- **Stops it:** records are Ed25519 signatures over canonical JSON; the
+  public key is at `/.well-known/ballotbench-signing-key`, and `/verify`
+  checks one without needing an account. Changing one character of a record
+  makes it fail. Records never contain scores. The private key lives on the
+  data volume, created with mode 0600, never in the repository.
+- **Doesn't stop it:** someone who can read the data volume can sign
+  anything. There's no revocation list and no key rotation yet: a new key
+  makes every old record fail to verify.

@@ -110,6 +110,18 @@ they're published.
   tests whether the judges agree more than chance. On the fixture they don't,
   and the portal says so rather than printing a confident ranking of noise.
   [JUDGING.md](JUDGING.md) has the maths and the proof.
+- **"Why did we come fourth?" gets an answer.** After results are published,
+  each team can open a page that shows every review of its project with the
+  judge anonymized: what that judge gave them, what that judge gives a typical
+  project, and how much the review counted, including why some counted for
+  nothing. [How it works](JUDGING.md#11-explaining-a-rank-to-the-team).
+- **Extra reviews go where they can change who wins.** After a calibration,
+  the assignment page lists the projects whose plausible rank crosses the
+  prize line and gives each exactly one more review, instead of spreading
+  judge time evenly over projects that can't win and can't miss.
+- **A second opinion no judge's habits can move.** Next to each calibrated
+  rank is a Bradley-Terry ranking built only from which of two projects each
+  judge scored higher.
 - **The fixture's traps are handled visibly**: the constant judge `jdg_07`,
   the single-review judges, the eight projects from unfinished batches, and
   the duplicate `prj_41`.

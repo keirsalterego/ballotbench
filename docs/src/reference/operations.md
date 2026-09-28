@@ -152,9 +152,11 @@ itself and nobody can reach port 8080 except through the proxy. Bind the
 port to `127.0.0.1` as in the override above, or keep it off the host
 entirely.
 
-The portal has **no login rate limit** and sign-up doesn't verify email
-addresses, so the proxy is also where to limit how fast anyone can try
-passwords or create accounts. An nginx example:
+The portal limits logins per address and per account, and sign-ups and
+password resets per address (in the database, so every worker shares the
+counts; see `BALLOTBENCH_ADDRESS_LIMIT_SCALE`). A proxy is still the right
+place for a coarse limit on everything, before a request reaches Python. An
+nginx example:
 
 ```nginx
 limit_req_zone $binary_remote_addr zone=bb_auth:10m rate=10r/m;
@@ -449,8 +451,9 @@ network.
 
 Things I'd want to know before running an event on it:
 
-- Sign-up doesn't verify email ownership. Logins and sign-ups are rate
-  limited per address, but a proxy with its own limits is still wise.
+- An account must confirm its address before it can vote, but anyone with a
+  working inbox can sign up. Logins, sign-ups and resets are rate limited;
+  a proxy with its own limits is still wise.
 - Behind a proxy, set `BALLOTBENCH_TRUSTED_PROXIES` to the number of proxies,
   or the audit log and the rate limits see the proxy's address.
 - Mail goes to the outbox table, readable in the admin. For real delivery,

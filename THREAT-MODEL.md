@@ -29,8 +29,11 @@ and what doesn't stop it.
   `vote.duplicate_refused`; its link goes to the spelling just typed, and
   replaces the last one, so whoever typed `alice+x@` first doesn't get
   `alice@`'s links. An address with a quoted local part (`"a.b"@gmail.com`)
-  is refused rather than normalized. Sign-ups are rate limited per address (10 an
-  hour), link requests per address (5 an hour) and per inbox (3 an hour).
+  is refused rather than normalized. Accounts must confirm their address by
+  a link before they can vote. Sign-ups, link requests and resets are rate
+  limited per address (the written limits times
+  `BALLOTBENCH_ADDRESS_LIMIT_SCALE`, 10 by default, so a venue behind one NAT
+  address isn't locked out) and link requests per inbox (3 an hour).
   The organizer's abuse panel (`voting.abuse_report`) flags networks (/24,
   or /64 for IPv6) with three or more voters, accounts created less than an
   hour before their first ballot, and three or more identical ballots.

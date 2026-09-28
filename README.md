@@ -223,10 +223,11 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
   shown once to whoever creates them, and voting links land in an outbox
   table that site admins read in the admin. Set `DJANGO_EMAIL_BACKEND` to
   Django's SMTP backend to really send them.
-- **Sign-up doesn't verify email ownership.** Logins and sign-ups are rate
-  limited per address, but an account-mode vote is only as strong as the
-  sign-up: someone with many addresses can make many accounts. The abuse
-  panel flags new accounts and shared networks; it doesn't stop them.
+- **An account is only as real as its inbox.** Accounts must confirm their
+  address before they can vote, and logins, sign-ups and resets are rate
+  limited, but someone with many real inboxes can still make many accounts.
+  The abuse panel flags new accounts and shared networks; it doesn't stop
+  them.
 - **Email-mode votes are one per inbox, not one per person.** Someone with
   ten real inboxes (or a domain with a catch-all) gets ten ballots. There is
   no CAPTCHA, no phone check and no proof of personhood; the organizer's

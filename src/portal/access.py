@@ -9,8 +9,9 @@ Status codes, the same on HTML pages and the API:
 """
 from contextlib import contextmanager
 
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connection, transaction
 from django.db.models import Q
+from django.db.models.functions import Now
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions, status
 
@@ -65,6 +66,25 @@ def organizer_event_or_deny(user, slug):
     if not is_organizer(user, event):
         raise exceptions.PermissionDenied("organizers of this event only")
     return event
+
+
+def submissions_closed_reason(event):
+    """None while `event` takes submissions, else why not. Read on the
+    database's clock, the same clock the deadline trigger uses."""
+    state = Event.objects.filter(pk=event.pk).values(
+        early=Q(submissions_open__gt=Now()), late=Q(submissions_close__lte=Now())).get()
+    if state["late"]:
+        return f"Submissions for {event.name} closed at {event.submissions_close:%Y-%m-%d %H:%M} UTC."
+    if state["early"]:
+        return f"Submissions for {event.name} open at {event.submissions_open:%Y-%m-%d %H:%M} UTC."
+    return None
+
+
+def db_now():
+    """The database's clock: the one every deadline is judged by."""
+    with connection.cursor() as cur:
+        cur.execute("SELECT now()")
+        return cur.fetchone()[0]
 
 
 class Conflict(exceptions.APIException):

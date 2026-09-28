@@ -1,7 +1,6 @@
 """The JSON API. Every route authenticates with a bearer token or a session,
 and every object lookup goes through the scoped querysets in access.py."""
-from django.db.models import Exists, OuterRef, Q
-from django.db.models.functions import Now
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import exceptions, permissions
@@ -9,7 +8,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from . import audit
-from .access import Conflict, guarded, is_organizer, judge_assignments, organizer_events, visible_projects
+from .access import (Conflict, db_now, guarded, judge_assignments, organizer_events, submissions_closed_reason,
+                     visible_projects)
 from .duplicates import find_duplicates
 from .models import Event, Membership, Project, Review, TeamMember, User
 from .serializers import EventSerializer, ProjectSerializer, ReviewScoresSerializer
@@ -19,14 +19,8 @@ PROJECT_FIELDS = ["title", "tagline", "summary", "description", "repo_url", "dem
 
 
 def require_submissions_open(event):
-    """409 unless the event takes submissions right now, by the database's
-    clock, the same clock the deadline trigger reads."""
-    state = Event.objects.filter(pk=event.pk).values(
-        before=Q(submissions_open__gt=Now()), after=Q(submissions_close__lte=Now())).get()
-    if state["after"]:
-        raise Conflict(f"submissions for {event.name} closed at {event.submissions_close.isoformat()}")
-    if state["before"]:
-        raise Conflict(f"submissions for {event.name} open at {event.submissions_open.isoformat()}")
+    if reason := submissions_closed_reason(event):
+        raise Conflict(reason)
 
 
 def flag_duplicates(request, event):
@@ -47,7 +41,7 @@ def save_project(request, event, project, data, *, created):
         project = serializer.save()
         if submit and project.status != Project.Status.SUBMITTED:
             project.status = Project.Status.SUBMITTED
-            project.submitted_at = Event.objects.filter(pk=event.pk).values_list(Now(), flat=True).get()
+            project.submitted_at = db_now()
             project.save(update_fields=["status", "submitted_at", "updated_at"])
     action = "project.create" if created else "project.update"
     if submit:

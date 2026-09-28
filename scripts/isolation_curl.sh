@@ -73,14 +73,25 @@ expect 404 "judge reads unpublished results"              GET "/api/events/$EV/r
 expect 404 "participant reads unpublished results"        GET "/api/events/$EV/results" "$PT"
 
 echo "== organizer pages with a token that isn't an organizer's"
-for page in manage manage/assign manage/progress manage/calibration manage/audit manage/duplicates manage/exports; do
+for page in manage manage/assign manage/progress manage/calibration manage/audit manage/duplicates manage/exports manage/voting; do
   expect 403 "judge opens $page"                          GET "/events/$EV/$page" "$JA"
   expect 403 "participant opens $page"                    GET "/events/$EV/$page" "$PT"
 done
 
+echo "== community vote and comments"
+expect 401 "anonymous reads a ballot"                     GET "/api/events/demo-open/ballot"
+expect 401 "anonymous casts a ballot"                     POST "/api/events/demo-open/ballot" "" '{"votes":{}}'
+expect 401 "a made-up token casts a ballot"               POST "/api/events/demo-open/ballot" "Authorization: Bearer bb_guess" '{"votes":{}}'
+expect 404 "participant votes where there is no vote"     POST "/api/events/$EV/ballot" "$PT" '{"votes":{}}'
+expect 404 "anonymous opens a ballot with no vote"        GET "/events/$EV/vote"
+expect 404 "a made-up voting link"                        GET "/vote/confirm/not-a-real-token"
+expect 404 "anonymous reads unpublished demo results"     GET "/api/events/demo-open/results"
+expect 401 "anonymous comments"                           POST "/api/projects/$A_PROJECT/comments" "" '{"body":"hi"}'
+
 echo "== public pages stay public"
 expect 200 "gallery"                                      GET "/projects"
 expect 200 "a submitted project"                          GET "/projects/$A_PROJECT"
+expect 200 "a submitted project's comments"               GET "/api/projects/$A_PROJECT/comments"
 expect 200 "api schema"                                   GET "/api/schema"
 
 echo

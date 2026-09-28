@@ -41,8 +41,9 @@ them off (see [Running it for real](operations.md#demo-accounts)).
 | participant | `bb_demo_participant_61b0c4` | team NorthKiln in the fixture event, participant in the demo event |
 
 `judge_a` and `judge_b` share no project, so each has scores the other must
-not see. There's no page for making tokens yet; [Running it for
-real](operations.md#api-tokens) shows how to issue one from a shell.
+not see. Anyone signed in can issue and revoke their own tokens at
+`/me/tokens` (linked from My events); a token is shown once and only its
+hash is stored.
 
 ### Browser sessions
 
@@ -55,11 +56,13 @@ request can't carry one.
 
 ### Pages accept tokens too
 
-The HTML pages accept the same bearer tokens. A `GET` with a token sees
-exactly what that user would see in a browser, and no session is created.
-This is what lets the isolation probe test the pages with `curl`. Page
-forms still need a CSRF token, so scripts that write should use the API. A
-bad token on a page gets a plain-text 401.
+The HTML pages accept the same bearer tokens, for reading only. A `GET`
+with a token sees exactly what that user would see in a browser, and no
+session is created; this is what lets the isolation probe test the pages
+with `curl`. Anything that would change something through a page (a `POST`)
+is refused with 403 when it comes with a token, and so are `/me/tokens` and
+the admin: a leaked token can't mint more tokens. Scripts that write use the
+API. A bad token on a page gets a plain-text 401.
 
 ## Status codes
 
@@ -102,6 +105,15 @@ object for a 400.
 | GET | [`/api/judge/scores`](#your-scores) | judges, for themselves; organizers, for their events' judges |
 | GET | [`/api/events/<slug>/results`](#results) | anyone once published; before that, the event's organizers |
 | GET | [`/api/events/<slug>/export/<kind>.csv`](#csv-exports) | the event's organizers |
+| GET | `/api/events/<slug>/results/signed` | anyone once published: the ranking signed with the portal's Ed25519 key |
+| GET, POST | `/api/events/<slug>/ballot` | voters, in events that vote by signed-in account (confirmed address) |
+| GET, POST | `/api/projects/<id>/comments` | anyone reads; signed-in users post |
+| GET | `/api/judge/record?event=<slug>` | a judge, for their own signed record; organizers may name a judge of their event |
+| GET | `/api/participant/record?event=<slug>` | a participant, for their own signed record |
+| POST | `/api/verify` | anyone: checks a signed record or signed results |
+| GET | `/.well-known/ballotbench-signing-key` | anyone: the public key records and results are signed with |
+| GET | `/api/events/<slug>/export/bundle.json` | the event's organizers: the whole event as one file |
+| POST | `/api/events/import?slug=<new>` | site admins: a bundle back in as a new event |
 | GET | [`/api/schema`](#the-openapi-document-and-the-reference-page) | anyone |
 | GET | [`/api/docs`](#the-openapi-document-and-the-reference-page) | anyone |
 

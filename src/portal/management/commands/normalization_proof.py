@@ -103,10 +103,17 @@ class Command(BaseCommand):
         else:
             out("  The judges agree far more than chance would: there is a real signal to calibrate.\n")
 
-        raw_order = sorted(result.projects, key=lambda p: (-result.projects[p].raw_mean, p))
-        cal_order = sorted(result.projects, key=lambda p: (-result.projects[p].quality, -result.projects[p].raw_mean, p))
+        # Rank what the product ranks: flagged duplicates stay out, though
+        # their reviews still inform the judges' calibration.
+        dupes = {p.pk: p for p in ev.projects.filter(duplicate_of__isnull=False).select_related("duplicate_of")}
+        for pid, p in dupes.items():
+            out(f"Left out of the ranking: {p.external_id} ({p.title}) repeats {p.duplicate_of.external_id}; "
+                f"its {result.projects[pid].n} reviews still count towards calibrating their judges.")
+        ranked = [p for p in result.projects if p not in dupes]
+        raw_order = sorted(ranked, key=lambda p: (-result.projects[p].raw_mean, p))
+        cal_order = sorted(ranked, key=lambda p: (-result.projects[p].quality, -result.projects[p].raw_mean, p))
         raw_rank = {p: i + 1 for i, p in enumerate(raw_order)}
-        intervals = bootstrap(obs)
+        intervals = bootstrap(obs, rankable=set(ranked))
         out(f"{'rank':>4} {'could be':>9} {'raw':>4} {'move':>5}  {'project':<8} {'title':<16} {'n':>2} "
             f"{'raw mean':>8} {'calibrated':>10}")
         for i, pid in enumerate(cal_order, 1):

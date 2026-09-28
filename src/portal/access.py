@@ -2,10 +2,12 @@
 rules live in one place and the views can't forget them.
 
 Status codes, the same on HTML pages and the API:
+- 400: the request itself is malformed (a missing field, a wrong type).
 - 401: no credentials on a route that needs them.
 - 403: you lack the role, or you named another principal (`?judge=`).
 - 404: the object exists but is outside your scope, so we don't confirm it.
-- 409: the window for this action is closed.
+- 409: the window for this action is closed, or a conflict of interest.
+- 422: well-formed values the rules refuse (a score out of range).
 """
 from contextlib import contextmanager
 

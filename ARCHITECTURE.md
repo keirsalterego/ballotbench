@@ -92,6 +92,8 @@ the triggers are for when someone forgets.
 
 The same everywhere, pages and API:
 
+- **400**: the request is malformed: a required field missing, a wrong type,
+  a track from another event.
 - **401**: no credentials, or a bad token, on a route that needs them. Pages
   redirect a browser to the login page instead.
 - **403**: you're signed in but your role can't do this, or you named another

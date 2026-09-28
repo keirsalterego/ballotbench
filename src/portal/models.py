@@ -32,6 +32,9 @@ class User(AbstractUser):
     last_name = None
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=200, blank=True)
+    # Set when the person proves they read this inbox: a confirmation link, or
+    # a completed password reset. Account-mode voting needs it.
+    email_confirmed_at = models.DateTimeField(null=True, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

@@ -206,3 +206,14 @@ dl.facts dd { margin: 0; }
   .certificate { border: 1px solid var(--rule); border-top: 3px solid var(--ink); margin: 0; break-inside: avoid; }
   .certificate a { color: inherit; }
 }
+
+/* The embeddable gallery: the docket, without the masthead, sized to fit a
+   column on someone else's page. */
+.embed main { max-width: none; padding: calc(var(--step) * 4); }
+.embed h1 { font-size: 1.5rem; }
+.embed h2 { font-size: 1.15rem; margin-top: calc(var(--step) * 6); }
+.embed .docket { grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); column-gap: calc(var(--step) * 6); }
+.embed .docket h3 { margin: 0 0 calc(var(--step) * 1); font-size: 1.05rem; }
+.embed .docket h3 a { color: var(--ink); text-decoration: none; }
+.embed .docket h3 a:hover { text-decoration: underline; }
+.docket.ranked { display: block; }

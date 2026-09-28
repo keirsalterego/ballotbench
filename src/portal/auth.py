@@ -6,6 +6,7 @@ no CSRF check for it; session-authenticated API calls still get one."""
 import hashlib
 import secrets
 
+from django.http import HttpResponse
 from rest_framework import authentication, exceptions
 
 from .models import ApiToken
@@ -46,3 +47,26 @@ class BearerTokenAuthentication(authentication.BaseAuthentication):
         # Makes DRF answer 401 (with WWW-Authenticate) rather than 403 when
         # no credentials were sent.
         return self.keyword
+
+
+class BearerTokenMiddleware:
+    """Pages accept the same bearer tokens as the API, so a script (or the
+    isolation probe) sees the same role checks a browser does. It never
+    creates a session, and page POSTs still need a CSRF token: scripts that
+    write should use the API."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path.startswith("/api/"):
+            return self.get_response(request)        # DRF authenticates API calls itself
+        header = request.META.get("HTTP_AUTHORIZATION", "")
+        scheme, _, token = header.partition(" ")
+        if scheme.lower() == "bearer" and token.strip():
+            row = (ApiToken.objects.select_related("user")
+                   .filter(token_hash=hash_token(token.strip()), revoked_at__isnull=True).first())
+            if row is None or not row.user.is_active:
+                return HttpResponse("invalid or revoked token\n", status=401, content_type="text/plain")
+            request.user = row.user
+        return self.get_response(request)

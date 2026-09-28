@@ -122,3 +122,10 @@ def test_editing_another_teams_project_is_refused(api):
     response = api("participant").patch(f"/api/projects/{other.pk}", {"title": "mine now"},
                                         content_type="application/json")
     assert response.status_code == 403
+
+
+def test_pages_accept_tokens_with_the_same_role_checks(api):
+    assert api("judge_a").get(f"/events/{EVENT}/manage").status_code == 403
+    assert api("organizer").get(f"/events/{EVENT}/manage").status_code == 200
+    from django.test import Client
+    assert Client(HTTP_AUTHORIZATION="Bearer nope").get("/projects").status_code == 401

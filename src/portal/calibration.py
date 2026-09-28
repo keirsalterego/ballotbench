@@ -221,3 +221,37 @@ def digest(rows):
     anyone with the scores export can check a published result."""
     canon = json.dumps(sorted(rows), separators=(",", ":"))
     return hashlib.sha256(canon.encode()).hexdigest()
+
+
+def bootstrap(obs, rankable=None, resamples=200, seed=1):
+    """How much would the ranking move if the same judges had happened to
+    write slightly different reviews? Resample each project's reviews with
+    replacement, refit, and record where each project lands.
+
+    The model's own standard error assumes the judges' offsets and scales
+    are known exactly. They aren't: with three or four reviews each they are
+    estimated from little, and on scores with no real signal the fit can
+    move a project many places on noise. The bootstrap interval shows that.
+
+    Returns {project: (rank_low, rank_high, sd_of_q)} with a 90% interval."""
+    obs = list(obs)
+    by_p = defaultdict(list)
+    for o in obs:
+        by_p[o[1]].append(o)
+    projects = sorted(by_p, key=str)
+    ranked = [p for p in projects if rankable is None or p in rankable]
+    rng = random.Random(seed)
+    ranks, qs = defaultdict(list), defaultdict(list)
+    for _ in range(resamples):
+        sample = [rng.choice(by_p[p]) for p in projects for _ in by_p[p]]
+        f = fit(sample)
+        order = sorted(ranked, key=lambda p: (-f.projects[p].quality, str(p)))
+        for rank, p in enumerate(order, 1):
+            ranks[p].append(rank)
+            qs[p].append(f.projects[p].quality)
+    result = {}
+    for p in ranked:
+        rs = sorted(ranks[p])
+        low, high = rs[int(0.05 * (len(rs) - 1))], rs[int(math.ceil(0.95 * (len(rs) - 1)))]
+        result[p] = (low, high, math.sqrt(_var(qs[p])))
+    return result

@@ -15,6 +15,9 @@ revoke a link you haven't used. The event sets the largest team size.
 
 ## Your project
 
+A team usually submits one project, but may submit more (the fixture has a
+team with two); each is judged on its own.
+
 **Start your project** and fill in what you have: title, a one-line tagline,
 a summary, the description, links to the code and a demo, tags and a track.
 

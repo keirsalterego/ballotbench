@@ -70,7 +70,7 @@ Two events are seeded:
 
 ```sh
 python3 run.py .dogfood.toml                                      # the official checker
-sh scripts/isolation_curl.sh                                      # 68 attempts at things you shouldn't reach
+sh scripts/isolation_curl.sh                                      # tries to reach what it shouldn't, and checks public pages stay public
 docker compose exec web python manage.py normalization_proof      # every number in JUDGING.md, recomputed
 docker compose exec web python manage.py verify_audit             # the audit log's hash chain
 ```

@@ -1,0 +1,26 @@
+{% extends "portal/base.html" %}
+{% block title %}API tokens{% endblock %}
+{% block content %}
+<h1>API tokens</h1>
+<p>A token lets a script use the <a href="{% url 'api-docs' %}">API</a> as you, with your roles and nothing more.
+  Send it as <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+{% if new_token %}
+<p><strong>Your new token, shown once:</strong></p>
+<pre>{{ new_token }}</pre>
+<p class="faint">Copy it now. Only a hash of it is stored, so nobody can show it to you again.</p>
+{% endif %}
+<form method="post" class="filters">{% csrf_token %}
+  <input name="label" placeholder="What it's for" maxlength="100" aria-label="Label">
+  <button>Issue a token</button>
+</form>
+{% if tokens %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Label</th><th>Issued (UTC)</th><th>State</th><th></th></tr></thead>
+  <tbody>{% for t in tokens %}
+  <tr><td>{{ t.label }}</td><td>{{ t.created_at|date:"j M Y H:i" }}</td>
+    <td>{% if t.revoked_at %}revoked {{ t.revoked_at|date:"j M H:i" }}{% else %}active{% endif %}</td>
+    <td>{% if not t.revoked_at %}<form method="post" action="{% url 'token-revoke' t.pk %}" class="inline">{% csrf_token %}<button class="link">revoke</button></form>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endblock %}

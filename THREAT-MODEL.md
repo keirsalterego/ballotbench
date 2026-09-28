@@ -167,5 +167,6 @@ and what doesn't stop it.
   (`ratelimit.allow`) so every worker shares them. IPv6 is limited per /64,
   because one subscriber usually holds a whole /64.
 - **Doesn't stop it:** a real denial of service. Put a proxy in front. The
-  limits trust `REMOTE_ADDR`, so behind a proxy it must set the client's
-  address, or everyone shares one limit.
+  limits key on the address the audit log records (`audit.client_ip`), so
+  behind a proxy that must be the visitor's address, not the proxy's, or
+  everyone shares one limit.

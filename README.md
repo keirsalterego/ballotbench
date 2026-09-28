@@ -179,8 +179,9 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
   ten real inboxes (or a domain with a catch-all) gets ten ballots. There is
   no CAPTCHA, no phone check and no proof of personhood; the organizer's
   judgement, helped by the flags, is the last line.
-- **Rate limits trust `REMOTE_ADDR`.** Behind a proxy, configure it to set
-  the client address, or every visitor shares one limit.
+- **Rate limits are per client address**, the same address the audit log
+  records (`audit.client_ip`). Behind a proxy that address must be the
+  visitor's, not the proxy's, or every visitor shares one limit.
 - **Calibration assumes linear judges.** It can't correct a judge who only
   compresses the top of the scale, and it can't detect judges who collude.
   See [known limits](JUDGING.md#10-known-limits).

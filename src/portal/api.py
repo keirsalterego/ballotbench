@@ -107,12 +107,15 @@ def project_detail(request, pk):
     return Response(save_project(request, event, project, request.data, created=False))
 
 
-def resolve_judge(value):
-    """A judge named by fixture id (jdg_24), email, or user id."""
-    q = Q(email=value.lower()) | Q(memberships__role=Membership.Role.JUDGE, memberships__external_id=value)
+def resolve_judge(value, events):
+    """A judge of one of `events`, named by fixture id (jdg_24), email or user
+    id. Fixture ids are only unique within an event, so the lookup is scoped
+    to the events the caller can see."""
+    judge = Q(memberships__role=Membership.Role.JUDGE, memberships__event__in=events)
+    q = Q(email=value.lower()) | Q(memberships__external_id=value)
     if value.isascii() and value.isdigit():
         q |= Q(pk=int(value))
-    return User.objects.filter(q).distinct().first()
+    return User.objects.filter(judge & q).distinct().first()
 
 
 @extend_schema(
@@ -130,7 +133,8 @@ def judge_scores(request):
     named = request.query_params.get("judge")
     target = user
     if named:
-        target = resolve_judge(named)
+        target = user if named in {user.email, str(user.pk)} or Membership.objects.filter(
+            user=user, role=Membership.Role.JUDGE, external_id=named).exists() else resolve_judge(named, organizer_events(user))
         if target != user:
             if not organizer_events(user).exists():
                 raise exceptions.PermissionDenied("judges can only read their own scores")

@@ -102,7 +102,7 @@ def api_judge_record(request):
     event = _event_param(request)
     target = request.user
     named = request.query_params.get("judge")
-    if named and resolve_judge(named) != request.user:
+    if named and resolve_judge(named, Event.objects.filter(pk=event.pk)) != request.user:
         if not is_organizer(request.user, event):
             raise exceptions.PermissionDenied("judges can only fetch their own record")
         q = Q(external_id=named) | Q(user__email=named.lower())

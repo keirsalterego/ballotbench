@@ -54,8 +54,10 @@ Password for all of them: `ballotbench-demo`.
 | Judge B (`jdg_29`) | `ines.rocha@example.org` | `Authorization: Bearer bb_demo_judge_b_3a9e77` |
 | Participant | `priya1@example.org` | `Authorization: Bearer bb_demo_participant_61b0c4` |
 
-These are public, so they are for the demo only: set `BALLOTBENCH_DEMO_SEED`
-to `0` in `docker-compose.yml` and they are never created.
+These are public, so they are for the demo only. For a real event, set
+`BALLOTBENCH_DEMO_SEED` to `0` in `docker-compose.yml`: then nothing demo is
+loaded (no accounts, no fixture event, no demo event), and you make the first
+admin with `docker compose exec web python manage.py createsuperuser`.
 
 Two events are seeded:
 

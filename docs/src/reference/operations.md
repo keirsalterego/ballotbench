@@ -39,7 +39,7 @@ and the seed command. This is all of them.
 | `POSTGRES_PASSWORD` | `ballotbench` | `ballotbench` | database password |
 | `POSTGRES_HOST` | `localhost` | `db` | database host |
 | `POSTGRES_PORT` | `5432` | not set | database port |
-| `BALLOTBENCH_DEMO_SEED` | off | `"1"` | `1` creates the demo accounts and their fixed tokens on boot |
+| `BALLOTBENCH_DEMO_SEED` | off | `"1"` | `1` loads the fixture event, the open demo event and the demo accounts with their fixed tokens on boot; anything else loads nothing |
 | `BALLOTBENCH_FIXTURES` | `/app/fixtures.json` in the image | not set | the fixture file the seed imports on every boot |
 | `WEB_WORKERS` | `3` | not set | gunicorn worker processes |
 
@@ -119,13 +119,12 @@ User.objects.filter(email__in=['admin@ballotbench.local', 'organizer@ballotbench
 
 A deactivated user can't sign in, and their tokens are refused.
 
-**The two seeded events stay.** The seed imports the fixture event (Sample
-Hack 2026) and creates the open demo event on every boot, whatever
-`BALLOTBENCH_DEMO_SEED` says, and its projects appear in the public gallery.
-Deleting them with `delete_event` doesn't last: the next boot creates them
-again. There's no switch for this yet. It's harmless to the data of a real
-event (nothing links them), but it's visible, and I list it under
-[known sharp edges](#known-sharp-edges).
+**The seeded events follow the same switch.** With `BALLOTBENCH_DEMO_SEED` set
+to anything but `1`, the seed loads nothing: no fixture event, no demo event,
+no accounts. A deployment that already has them keeps them (the seed never
+deletes); remove them for good with
+`docker compose exec web python manage.py delete_event sample-hack-2026 --yes`
+(and `demo-open`), and they won't come back.
 
 ## TLS and a reverse proxy
 
@@ -445,11 +444,13 @@ network.
 
 Things I'd want to know before running an event on it:
 
-- The seeded fixture and demo events are created on every boot and can't be
-  switched off or deleted for good.
-- There's no login rate limit and no email verification; the proxy has to
-  provide the first, and the second needs email.
-- Behind a proxy, the audit log's address column shows the proxy.
+- Sign-up doesn't verify email ownership. Logins and sign-ups are rate
+  limited per address, but a proxy with its own limits is still wise.
+- Behind a proxy, set `BALLOTBENCH_TRUSTED_PROXIES` to the number of proxies,
+  or the audit log and the rate limits see the proxy's address.
+- Mail goes to the outbox table, readable in the admin. For real delivery,
+  set `DJANGO_EMAIL_BACKEND` to Django's SMTP backend and configure it.
 - Calibration runs inside the organizer's request. On the fixture that's a
   few seconds; there's no background worker.
-- Public voting is being built, and isn't in this version.
+- Community vote tallies are computed when read. Voiding a ballot after
+  publishing changes the public numbers (and is in the audit log).

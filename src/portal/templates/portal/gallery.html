@@ -1,9 +1,9 @@
 {% extends "portal/base.html" %}
-{% block title %}Gallery{% endblock %}
+{% block title %}Projects{% endblock %}
 {% block content %}
-<h1>Project gallery</h1>
+<h1>{% if event %}{{ event.name }}{% else %}Every submitted project{% endif %}</h1>
 <form class="filters" method="get" role="search">
-  <input type="search" name="q" value="{{ q }}" placeholder="Search title, summary, team, tag" aria-label="Search projects">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search by title, summary, team or tag" aria-label="Search projects">
   <select name="event" aria-label="Event">
     <option value="">All events</option>
     {% for e in events %}<option value="{{ e.slug }}"{% if e == event %} selected{% endif %}>{{ e.name }}</option>{% endfor %}
@@ -14,27 +14,29 @@
     {% for t in tracks %}<option value="{{ t.pk }}"{% if t.pk|stringformat:"s" == track %} selected{% endif %}>{{ t.name }}</option>{% endfor %}
   </select>
   {% endif %}
-  <button>Filter</button>
+  <button>Search</button>
 </form>
-<p class="muted">{{ page.paginator.count }} submitted project{{ page.paginator.count|pluralize }}</p>
-<ul class="grid">
+<p class="count">{% if page.paginator.count %}{{ page.paginator.count }} project{{ page.paginator.count|pluralize }}{% if q %} matching “{{ q }}”{% endif %}{% endif %}</p>
+{% if page.object_list %}
+<ol class="docket">
 {% for p in page %}
-  <li class="card">
+  <li>
     <h2><a href="{% url 'project' p.pk %}">{{ p.title }}</a></h2>
-    <p class="muted">{{ p.team.name }}{% if p.track %} · {{ p.track.name }}{% endif %} · {{ p.event.name }}</p>
-    <p>{{ p.tagline|default:p.summary|truncatechars:140 }}</p>
-    {% if p.duplicate_of_id %}<span class="badge warn">possible duplicate</span>{% endif %}
-    {% for t in p.tags %}<a class="badge" href="?tag={{ t|urlencode }}">{{ t }}</a>{% endfor %}
+    <p class="by">by {{ p.team.name }}{% if p.track %}, in {{ p.track.name }}{% endif %}{% if not event %}, {{ p.event.name }}{% endif %}</p>
+    <p>{{ p.tagline|default:p.summary|truncatechars:160 }}</p>
+    {% if p.duplicate_of_id %}<span class="flag">Looks like a resubmission of #{{ p.duplicate_of_id }}</span>{% endif %}
+    {% if p.tags %}<div class="tags">{% for t in p.tags %}<a href="?tag={{ t|urlencode }}">#{{ t }}</a>{% endfor %}</div>{% endif %}
   </li>
-{% empty %}
-  <li class="muted">No projects match.</li>
 {% endfor %}
-</ul>
+</ol>
+{% else %}
+<p>Nothing matches{% if q %} “{{ q }}”{% endif %}. Try fewer words, or <a href="{% url 'gallery' %}">clear the filters</a>.</p>
+{% endif %}
 {% if page.has_other_pages %}
-<nav class="filters">
-  {% if page.has_previous %}<a href="?{{ query }}&amp;page={{ page.previous_page_number }}">Previous</a>{% endif %}
-  <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
-  {% if page.has_next %}<a href="?{{ query }}&amp;page={{ page.next_page_number }}">Next</a>{% endif %}
+<nav class="pager" aria-label="Pages">
+  {% if page.has_previous %}<a href="?{{ query }}&amp;page={{ page.previous_page_number }}">Previous page</a>{% endif %}
+  <span class="faint">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="?{{ query }}&amp;page={{ page.next_page_number }}">Next page</a>{% endif %}
 </nav>
 {% endif %}
 {% endblock %}

@@ -11,6 +11,7 @@ session. It sets up its own events, so it never changes the fixture event,
 and can run any number of times.
 
     python3 scripts/check_t3_t4.py .dogfood.toml > t3-t4-report.txt
+    python3 scripts/check_t3_t4.py .dogfood.toml --base http://localhost:8099   # a stack on another port
 
 It changes the portal's data (it creates events, accounts, votes, comments
 and a webhook), so run it against a demo stack, not a real event.
@@ -89,7 +90,7 @@ class Client:
         except urllib.error.HTTPError as e:
             status, text, hdrs = e.code, e.read().decode(errors="replace"), e.headers
         if log and CURRENT is not None:
-            who = self.header.split(":", 1)[1].strip().split()[-1][:22] if self.header else getattr(self, "who", "anonymous")
+            who = getattr(self, "who", "anonymous")
             CURRENT.notes.append(f"{method} {path}  as {who}  -> {status}")
         return status, text, hdrs
 
@@ -210,9 +211,10 @@ def close_vote(org, slug, form):
 
 def main():
     if len(sys.argv) < 2:
-        raise SystemExit("usage: python3 scripts/check_t3_t4.py .dogfood.toml")
+        raise SystemExit("usage: python3 scripts/check_t3_t4.py .dogfood.toml [--base URL]")
     cfg = read_config(sys.argv[1])
-    base = cfg["portal"]["base_url"].rstrip("/")
+    configured = cfg["portal"]["base_url"].rstrip("/")
+    base = sys.argv[sys.argv.index("--base") + 1].rstrip("/") if "--base" in sys.argv else configured
     auth = cfg["auth"]
     run = datetime.now().strftime("%H%M%S")
     anon = Client(base)
@@ -220,9 +222,12 @@ def main():
     org = session(base, ORGANIZER)
     judge_a, judge_b = Client(base, auth["judge_a"]), Client(base, auth["judge_b"])
     organizer_token, participant = Client(base, auth["organizer"]), Client(base, auth["participant"])
+    for client, role in ((judge_a, "judge_a"), (judge_b, "judge_b"), (organizer_token, "organizer"),
+                         (participant, "participant")):
+        client.who = f"{role} (token)"
 
     print("DOGFOOD 2026 T3/T4 report (scripts/check_t3_t4.py; run.py covers T1 and T2)")
-    print(f"portal: {base}")
+    print(f"portal: {base}" + (f" (--base; .dogfood.toml says {configured})" if base != configured else ""))
     print()
 
     acct = f"chk-{run}-a"
@@ -330,6 +335,8 @@ def main():
         other.call("POST", f"/events/{email_slug}/vote/link", form={"email": same_inbox})
         s, csv_text, _ = organizer_token.call("GET", f"/api/events/{email_slug}/export/audit.csv")
         expect("vote.duplicate_refused" in csv_text, "a second spelling of one inbox should be refused and logged")
+        c.notes.append(f"the page answers {s} either way, so it can't reveal who voted; the audit log records "
+                       f"vote.duplicate_refused for {same_inbox}")
         s, fixture = anon.json("GET", "/api/events/sample-hack-2026/projects")
         expect(any(p.get("duplicate_of") for p in fixture), "the fixture's duplicate submission (prj_41) should be flagged")
 
@@ -363,6 +370,7 @@ def main():
         s, page, _ = org.call("GET", f"/events/{acct}/manage/webhooks")
         expect("93.184.215.14" in page and "track.create" in page,
                "the endpoint should be listed with a queued delivery for the change just made")
+        c.notes.append("the webhooks page lists the endpoint and a queued track.create delivery")
         s, _, _ = participant.call("GET", f"/events/{acct}/manage/webhooks")
         expect(s == 403, f"a participant opening the webhooks page should be 403, got {s}")
 

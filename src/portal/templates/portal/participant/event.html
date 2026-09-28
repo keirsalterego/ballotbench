@@ -1,0 +1,48 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block content %}
+<h1>{{ event.name }}</h1>
+<p class="muted">Submissions {{ event.submissions_open|date:"j M Y H:i" }} to {{ event.submissions_close|date:"j M Y H:i" }} UTC.
+{% if closed %}<span class="badge bad">{{ closed }}</span>{% else %}<span class="badge ok">open</span>{% endif %}</p>
+
+{% if not team %}
+  <h2>Your team</h2>
+  <p>You aren't on a team yet. Start one, or open an invite link a teammate sent you.</p>
+  {% if not closed %}
+  <form method="post" action="{% url 'team-create' event.slug %}" class="filters">{% csrf_token %}
+    <input name="name" placeholder="Team name" required maxlength="200" aria-label="Team name">
+    <button>Create team</button>
+  </form>
+  {% endif %}
+{% else %}
+  <h2>Team: {{ team.name }}</h2>
+  <ul>{% for m in members %}<li>{{ m.user.name|default:m.user.email }} <span class="muted">{{ m.user.email }}</span></li>{% endfor %}</ul>
+  <p class="muted">{{ members|length }} of {{ event.max_team_size }} places taken.</p>
+  {% if new_link %}
+    <p><strong>Invite link, shown once:</strong></p>
+    <pre>{{ new_link }}</pre>
+    <p class="muted">Single use. It expires in 72 hours or when submissions close, whichever is first.</p>
+  {% endif %}
+  {% if not closed %}
+  <form method="post" action="{% url 'invite-create' team.pk %}">{% csrf_token %}<button>Make an invite link</button></form>
+  {% endif %}
+  {% if invites %}
+  <h3>Open invites</h3>
+  <ul>{% for i in invites %}
+    <li>made {{ i.created_at|date:"j M H:i" }}, expires {{ i.expires_at|date:"j M H:i" }} UTC
+      <form method="post" action="{% url 'invite-revoke' team.pk i.pk %}" style="display:inline">{% csrf_token %}<button class="link">revoke</button></form></li>
+  {% endfor %}</ul>
+  {% endif %}
+
+  <h2>Project</h2>
+  {% for p in projects %}
+    <div class="card">
+      <h3><a href="{% url 'project' p.pk %}">{{ p.title }}</a> <span class="badge {% if p.status == 'submitted' %}ok{% else %}warn{% endif %}">{{ p.status }}</span></h3>
+      {% if p.duplicate_of_id %}<span class="badge warn">flagged as a possible duplicate</span>{% endif %}
+      {% if not closed %}<a href="{% url 'project-edit' event.slug p.pk %}">Edit</a>{% endif %}
+    </div>
+  {% empty %}
+    {% if not closed %}<a class="button" href="{% url 'project-new' event.slug %}">Start your project</a>{% else %}<p class="muted">No project was submitted.</p>{% endif %}
+  {% endfor %}
+{% endif %}
+{% endblock %}

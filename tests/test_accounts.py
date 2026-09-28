@@ -93,3 +93,27 @@ def test_new_token_is_shown_once(web):
     client.post("/me/tokens", {"label": "once"})
     assert "<pre>bb_" in client.get("/me/tokens").content.decode()
     assert "<pre>bb_" not in client.get("/me/tokens").content.decode()
+
+
+def test_password_reset_goes_to_the_inbox_and_works_once(web):
+    import re
+    from django.core import mail
+    web().post("/password-reset", {"email": "priya1@example.org"})
+    message = mail.outbox[-1]                      # the test runner's in-memory mailbox
+    assert message.to == ["priya1@example.org"]
+    link = re.search(r"/password-reset/[\w-]+/[\w-]+", message.body).group(0)
+    client = web()
+    form_url = client.get(link, follow=True).redirect_chain[-1][0]
+    response = client.post(form_url, {"new_password1": "a brand new passphrase", "new_password2": "a brand new passphrase"})
+    assert response.status_code == 302
+    assert web().login(email="priya1@example.org", password="a brand new passphrase")
+    assert AuditLog.objects.filter(action="user.password_reset").exists()
+    assert "doesn" in web().get(link, follow=True).content.decode()        # used once
+
+
+def test_password_reset_page_reads_the_same_for_unknown_addresses(web):
+    from django.core import mail
+    before = len(mail.outbox)
+    response = web().post("/password-reset", {"email": "nobody-here@example.org"})
+    assert response.status_code == 302 and response.url == "/password-reset/sent"
+    assert len(mail.outbox) == before

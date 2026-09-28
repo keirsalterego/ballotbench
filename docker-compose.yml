@@ -34,7 +34,8 @@ services:
       # Set to 0 for a real deployment and they are never created.
       BALLOTBENCH_DEMO_SEED: "1"
     ports:
-      - "8080:8080"
+      # BALLOTBENCH_PORT=9000 docker compose up, if 8080 is taken on your machine.
+      - "${BALLOTBENCH_PORT:-8080}:8080"
     # Healthy once the gallery answers, which is after migrate and seed. The
     # header tells a DJANGO_SECURE=1 deployment this probe already came in over
     # HTTPS, so it isn't redirected; without DJANGO_SECURE it's ignored.

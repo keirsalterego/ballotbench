@@ -37,7 +37,7 @@ The first block is a short list of facts about the run.
 | Reviews read | submitted, complete reviews the run used | 126 |
 | Fingerprint | SHA-256 of exactly the scores the run read | `397dd35f…178f4a` |
 | Judges linked | whether every judge can be compared with every other | Yes |
-| Agreement | whether the judges agree more than chance would | no (p = 0.71) |
+| Agreement | whether the judges agree more than chance would | no (p = 0.70) |
 
 ### Fingerprint
 
@@ -89,9 +89,8 @@ as the real scores do. That fraction is the p-value.
   flag. The ranking is computed anyway, but most of its order is noise.
 - **No reviews yet** if the run read nothing.
 
-The fixture reads p = 0.71: its scores behave like independent draws.
-(`normalization_proof` prints 0.698 for the same scores because it uses 2000
-shuffles rather than the page's 1000; both say the same thing.)
+The fixture reads p = 0.70 (the page and `normalization_proof` run the same
+test: 2000 shuffles, the same seed): its scores behave like independent draws.
 
 When p is high, I would not publish a ranking to three decimals. What I'd do,
 roughly in this order:

@@ -1,0 +1,29 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %} · ballotbench</title>
+<link rel="stylesheet" href="{% static 'portal/site.css' %}">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="{% url 'gallery' %}">ballotbench</a>
+  <nav>
+    <a href="{% url 'gallery' %}">Gallery</a>
+    {% if user.is_authenticated %}<a href="{% url 'home' %}">My events</a>{% endif %}
+    <a href="/api/docs">API</a>
+  </nav>
+  {% if user.is_authenticated %}
+    <span class="muted">{{ user.email }}</span>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="link">Log out</button></form>
+  {% else %}
+    <a href="{% url 'login' %}">Log in</a> <a href="{% url 'signup' %}">Sign up</a>
+  {% endif %}
+</header>
+<main>
+{% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

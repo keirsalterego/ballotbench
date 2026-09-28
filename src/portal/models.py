@@ -139,10 +139,9 @@ class Team(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["event", "name"], name="team_name_per_event"),
-            models.UniqueConstraint(fields=["event", "external_id"], name="team_external_id_per_event"),
-        ]
+        # Team names aren't unique: the fixture has three different teams
+        # called StillTrail. Teams are told apart by id.
+        constraints = [models.UniqueConstraint(fields=["event", "external_id"], name="team_external_id_per_event")]
 
     def __str__(self):
         return self.name

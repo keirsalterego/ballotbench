@@ -16,6 +16,7 @@
   {% endif %}
   <button>Search</button>
 </form>
+{% if event and event.voting_mode != "off" %}<p><a href="{% url 'ballot' event.slug %}">Vote for your favourites</a> in the community vote.</p>{% endif %}
 <p class="count">{% if page.paginator.count %}{{ page.paginator.count }} project{{ page.paginator.count|pluralize }}{% if q %} matching “{{ q }}”{% endif %}{% endif %}</p>
 {% if page.object_list %}
 <ol class="docket">

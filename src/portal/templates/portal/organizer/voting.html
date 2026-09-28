@@ -1,0 +1,54 @@
+{% extends "portal/base.html" %}
+{% block title %}Community vote: {{ event.name }}{% endblock %}
+{% block content %}
+<h1>Community vote</h1>
+{% include "portal/organizer/_nav.html" %}
+<dl class="facts">
+  <dt>Who votes</dt><dd>{% if event.voting_mode == "off" %}Nobody: voting is off. Turn it on in <a href="{% url 'manage' event.slug %}">Settings</a>.{% else %}{{ event.get_voting_mode_display|capfirst }}, {{ event.vote_credits }} credits each{% endif %}</dd>
+  <dt>Window</dt><dd>{% if event.voting_open and event.voting_close %}{{ event.voting_open|date:"j M Y H:i" }} to {{ event.voting_close|date:"j M Y H:i" }} UTC{% else %}not set{% endif %}{% if closed and event.voting_mode != "off" %}. {{ closed }}{% elif not closed %}. Open now.{% endif %}</dd>
+  <dt>Ballots counted</dt><dd>{{ counted }}{% if voided %}, and {{ voided }} voided{% endif %}</dd>
+  {% if event.voting_mode != "off" %}<dt>Ballot page</dt><dd><a href="{% url 'ballot' event.slug %}">{{ request.scheme }}://{{ request.get_host }}{% url 'ballot' event.slug %}</a></dd>{% endif %}
+</dl>
+
+<h2>Tallies</h2>
+<p>Only the organizers see these until the results are published, and results can't be published while voting is open. Voided ballots don't count.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Project</th><th>Team</th><th class="num">Votes</th><th class="num">Voters</th></tr></thead>
+  {% for r in rows %}
+  <tr><td><a href="{% url 'project' r.project.pk %}">{{ r.project.title }}</a></td><td>{{ r.project.team.name }}</td>
+    <td class="num">{{ r.votes }}</td><td class="num">{{ r.voters }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">No submitted projects yet.</td></tr>
+  {% endfor %}
+</table></div>
+
+<h2>Things to look at</h2>
+<p>These are reasons to look, not proof. Friends vote alike and offices share a network. Nothing is voided unless you void it.</p>
+<ul>
+  <li>{{ clusters|length }} network{{ clusters|length|pluralize }} with {{ cluster_size }} or more voters{% if clusters %}: {% for net, vs in clusters %}<code>{{ net }}</code> ({{ vs|length }}){% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}.</li>
+  <li>{{ identical|length }} ballot{{ identical|length|pluralize }} cast identically by {{ cluster_size }} or more voters{% if identical %}: {% for vs in identical %}{{ vs|length }} voters ({% for v in vs %}#{{ v.pk }}{% if not forloop.last %}, {% endif %}{% endfor %}){% if not forloop.last %}; {% endif %}{% endfor %}{% endif %}.</li>
+  <li>{{ new_accounts }} account{{ new_accounts|pluralize }} created less than an hour before {{ new_accounts|pluralize:"its,their" }} first ballot.</li>
+  <li>{{ duplicates }} sign-up{{ duplicates|pluralize }} refused because another spelling of the same inbox already had a ballot.</li>
+</ul>
+
+<h2>Voters</h2>
+<p class="muted">Flagged voters first. What each voter chose stays private; you see what they spent.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Ballot</th><th>Voter</th><th>Network</th><th>Since</th><th class="num">Credits</th><th class="num">Projects</th><th>Flags</th><th></th></tr></thead>
+  {% for v in voters %}
+  <tr{% if v.voided_at %} class="out"{% endif %}>
+    <td class="num">#{{ v.pk }}</td>
+    <td>{% if v.user %}{{ v.user.email }}{% if v.user.date_joined %} <span class="hint">account since {{ v.user.date_joined|date:"j M H:i" }}</span>{% endif %}{% else %}{{ v.email }}{% if not v.confirmed_at %} <span class="hint">not confirmed</span>{% endif %}{% endif %}</td>
+    <td><code>{{ v.network }}</code></td>
+    <td>{{ v.created_at|date:"j M H:i" }}</td>
+    <td class="num">{{ v.spent }}</td>
+    <td class="num">{{ v.ballot|length }}</td>
+    <td>{% for f in v.flags %}<span class="flag">{{ f }}</span>{% endfor %}{% if v.voided_at %}<span class="flag bad">voided: {{ v.voided_reason }}</span>{% endif %}</td>
+    <td><form method="post" action="{% url 'voter-void' event.slug v.pk %}" class="filters">{% csrf_token %}
+      {% if v.voided_at %}<button name="action" value="unvoid" class="link">count it again</button>
+      {% else %}<input name="reason" placeholder="Why" required maxlength="300" aria-label="Why void ballot #{{ v.pk }}"><button class="danger">Void</button>{% endif %}
+    </form></td>
+  </tr>
+  {% empty %}<tr><td colspan="8" class="muted">Nobody has voted yet.</td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

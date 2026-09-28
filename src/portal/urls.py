@@ -2,13 +2,16 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
-from . import api, apidocs, explain, exports, tokens, judge, organizer, oversight, participant, progress, results, views
+from . import (api, apidocs, comments, explain, exports, judge, organizer, oversight, participant, progress, results,
+               tokens, views, voting)
 
 urlpatterns = [
     path("", views.gallery),
     path("projects", views.gallery, name="gallery"),
     path("projects/<int:pk>", views.project_page, name="project"),
-    path("login", auth_views.LoginView.as_view(), name="login"),
+    path("projects/<int:pk>/comments", comments.post_comment, name="comment-add"),
+    path("comments/<int:pk>/moderate", comments.moderate, name="comment-moderate"),
+    path("login", views.login_page, name="login"),
     path("logout", auth_views.LogoutView.as_view(), name="logout"),
     path("signup", views.signup, name="signup"),
     path("me", views.home, name="home"),
@@ -22,6 +25,9 @@ urlpatterns = [
     path("teams/<int:pk>/invites", participant.create_invite, name="invite-create"),
     path("teams/<int:pk>/invites/<int:invite>/revoke", participant.revoke_invite, name="invite-revoke"),
     path("invite/<str:token>", participant.accept_invite, name="invite"),
+    path("events/<slug:slug>/vote", voting.ballot, name="ballot"),
+    path("events/<slug:slug>/vote/link", voting.request_link, name="vote-link"),
+    path("vote/confirm/<str:token>", voting.confirm, name="vote-confirm"),
 
     path("events/new", organizer.create_event, name="event-new"),
     path("events/<slug:slug>/manage", organizer.manage, name="manage"),
@@ -48,6 +54,8 @@ urlpatterns = [
     path("events/<slug:slug>/manage/duplicates", oversight.duplicates, name="duplicates"),
     path("events/<slug:slug>/manage/duplicates/<int:pk>", oversight.resolve_duplicate, name="duplicate-resolve"),
     path("events/<slug:slug>/manage/exports", oversight.exports_page, name="exports"),
+    path("events/<slug:slug>/manage/voting", voting.voting_page, name="voting-manage"),
+    path("events/<slug:slug>/manage/voting/voters/<int:pk>", voting.void_voter, name="voter-void"),
 
     path("judge", judge.queue, name="judge-queue"),
     path("judge/assignments/<int:pk>", judge.assignment_page, name="judge-assignment"),
@@ -60,7 +68,9 @@ urlpatterns = [
     path("api/events/<slug:slug>/projects", api.event_projects, name="api-event-projects"),
     path("api/events/<slug:slug>/export/<slug:kind>.csv", exports.export_csv, name="api-export"),
     path("api/events/<slug:slug>/results", results.api_results, name="api-results"),
+    path("api/events/<slug:slug>/ballot", voting.api_ballot, name="api-ballot"),
     path("api/projects/<int:pk>", api.project_detail, name="api-project"),
+    path("api/projects/<int:pk>/comments", comments.api_comments, name="api-comments"),
     path("api/judge/scores", api.judge_scores, name="api-judge-scores"),
     path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),
     path("api/judge/assignments/<int:pk>/review", judge.api_review, name="api-judge-review"),

@@ -57,6 +57,26 @@ and take back a review nobody has started.
 counts, and each project's finished reviews, fewest first. Projects below k
 are flagged *low coverage*.
 
+## The community vote
+
+Turn it on in Settings with **Voting mode**: *signed-in accounts* (anyone
+with an account votes once) or *confirmed email addresses* (anyone votes
+once per inbox, after opening a link we mail them). **Vote credits** is each
+voter's budget: n votes for one project cost n² credits. Send people to
+`/events/<slug>/vote`; the gallery and every project page link there too.
+
+With the network off, confirmation links can't leave the box. They land in
+**Outbound emails** in the admin, where a site admin can read them.
+
+**Community vote** in the organizer menu shows the tallies as they come in
+(only organizers see them until you publish results, which you can't do
+while voting is open) and a list of things worth a second look: several
+voters on one network, accounts made just before their ballot, identical
+ballots, and sign-ups refused because another spelling of the same inbox
+had already voted. None of these void anything by themselves. If you decide
+a ballot is fake, void it with a reason; it leaves the tallies, the audit
+log records it, and you can count it again later.
+
 ## Duplicates
 
 When a project has the same repository and title as an earlier one (or the

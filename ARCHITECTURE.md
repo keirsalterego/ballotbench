@@ -81,7 +81,10 @@ around them is thin.
 | scores in range | form and API validation | `score_rules` trigger |
 | rubric frozen once scored | page hides the inputs | `rubric_frozen` trigger |
 | audit log can't change | no update code exists | `audit_readonly`, `audit_no_truncate`, the hash chain |
-| results hidden until published | `results.visible_run` | (read rule; no write to guard) |
+| results hidden until published, and while voting is open | `results.visible_run`, `voting.public_tallies`; `results.publish` refuses while voting is open | (read rule; no write to guard) |
+| a vote: window, budget, own team, eligible project, confirmed and not voided | `voting.cast` | `vote_rules` trigger, locking the voter row |
+| one ballot per account and per inbox | `voting.normalize_email`, `request_link` | unique constraints on `portal_voter` |
+| rate limits | `ratelimit.allow`, counted in `portal_ratehit` | (shared across workers because it is in the database) |
 
 The database is the last word because a portal has more write paths than
 anyone remembers: pages, the API, the admin, a management command, a shell
@@ -116,9 +119,11 @@ The same everywhere, pages and API:
 - **The calibration in pure Python, no numpy.** A hackathon has tens of judges
   and hundreds of reviews: a fit takes 16 ms and 200 bootstrap refits take
   about 3 seconds. One dependency fewer in the image.
-- **No email.** The portal must run offline, so invite links are shown once
-  to the person who makes them, to send however they like. Mail goes to the
-  console. A real deployment adds an SMTP backend in `settings.py`.
+- **No email leaves the box.** The portal must run offline, so invite links
+  are shown once to the person who makes them, to send however they like.
+  The one thing that has to be mailed, a voter's confirmation link, lands in
+  an outbox table that site admins read in the admin. A real deployment sets
+  `DJANGO_EMAIL_BACKEND` to SMTP.
 - **Sessions and tokens side by side.** Browsers use sessions (with CSRF);
   scripts and the checker use bearer tokens (no cookies, so no CSRF risk).
   Pages accept tokens too so that the isolation probe tests what a browser

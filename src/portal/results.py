@@ -3,7 +3,9 @@
 Results stay hidden from everyone but the event's organizers until they are
 published, on the pages and in the API. Publishing freezes the results to
 one calibration run; a later run changes nothing public until someone
-publishes again."""
+publishes again. While a community vote is open, results can't be published
+and published ones are hidden again, so nobody votes with the judges'
+ranking in front of them."""
 from django.contrib import messages
 from django.db import transaction
 from django.http import Http404
@@ -21,6 +23,7 @@ from .models import CalibratedProject, CalibrationRun, Event, JudgeCalibration, 
 from .organizer import organizer_required
 from .progress import rankable_projects
 from .scoring import weighted_score
+from .voting import counted_voters, public_tallies, voting_is_open
 
 METHOD = "offset-scale-noise/v1"
 
@@ -135,6 +138,11 @@ def publish(request, event):
         audit.record("results.unpublish", request=request, event=event, obj=event, before=before)
         messages.success(request, "Results are hidden again.")
         return redirect("calibration", slug=event.slug)
+    if voting_is_open(event):
+        reason = (f"Community voting for {event.name} is open until {event.voting_close:%Y-%m-%d %H:%M} UTC, "
+                  "and results stay hidden until it closes. Nothing was published.")
+        return render(request, "portal/closed.html", {"event": event, "reason": reason,
+                                                      "heading": "Voting is still open"}, status=409)
     run = event.calibration_runs.order_by("-pk").first() or run_calibration(event, request.user, request)
     event.results_published_at, event.published_run = db_now(), run
     event.save(update_fields=["results_published_at", "published_run"])
@@ -145,9 +153,10 @@ def publish(request, event):
 
 
 def visible_run(user, event):
-    """The run a caller may see: the published one for everyone, the latest
-    for the event's organizers. None means hidden."""
-    if event.published_run_id:
+    """The run a caller may see: the published one for everyone (except while
+    a community vote is open), the latest for the event's organizers. None
+    means hidden."""
+    if event.published_run_id and not voting_is_open(event):
         return event.published_run
     if is_organizer(user, event):
         return event.calibration_runs.order_by("-pk").first()
@@ -165,24 +174,32 @@ def results_page(request, slug):
         mine = set(event.projects.filter(team__members__user=request.user).values_list("pk", flat=True))
         if is_organizer(request.user, event):
             mine = {r.project_id for r in rows}
+    community = public_tallies(event)
+    for r in rows:
+        r.community = community.get(r.project_id, (0, 0)) if community is not None else None
     return render(request, "portal/results.html", {"event": event, "run": run, "rows": rows, "mine": mine,
-                                                   "preview": not event.published_run_id})
+                                                   "preview": run.pk != event.published_run_id or voting_is_open(event),
+                                                   "community": community is not None})
 
 
 ResultRow = inline_serializer("ResultRow", {
     "rank": serializers.IntegerField(), "raw_rank": serializers.IntegerField(), "project": serializers.IntegerField(),
     "title": serializers.CharField(), "team": serializers.CharField(), "calibrated": serializers.FloatField(),
     "se": serializers.FloatField(), "raw_mean": serializers.FloatField(), "reviews": serializers.IntegerField(),
-    "rank_interval": serializers.ListField(child=serializers.IntegerField())},
+    "rank_interval": serializers.ListField(child=serializers.IntegerField()),
+    "community_votes": serializers.IntegerField(required=False, help_text="present once results are published "
+                                                "and the community vote has closed")},
     many=True)
 
 
 @extend_schema(responses=inline_serializer("Results", {
     "event": serializers.CharField(), "published_at": serializers.DateTimeField(allow_null=True),
     "run": serializers.IntegerField(), "input_digest": serializers.CharField(), "method": serializers.CharField(),
+    "community_voters": serializers.IntegerField(required=False, help_text="as community_votes"),
     "projects": ResultRow}),
-    description="Ranked results. 404 until published, except for the event's organizers, who see the "
-                           "latest calibration run.")
+    description="Ranked results. 404 until published, and while a community vote is open, except for the "
+                "event's organizers, who see the latest calibration run. Community vote totals appear only "
+                "once results are published and voting has closed.")
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def api_results(request, slug):
@@ -190,12 +207,15 @@ def api_results(request, slug):
     run = visible_run(request.user, event)
     if run is None:
         raise Http404
-    return Response({
-        "event": event.slug, "published_at": event.results_published_at, "run": run.pk,
-        "input_digest": run.input_digest, "method": run.method,
-        "projects": [{"rank": r.rank, "raw_rank": r.raw_rank, "project": r.project_id, "title": r.project.title,
-                      "team": r.project.team.name, "calibrated": round(r.display, 4), "se": round(r.se, 4),
-                      "raw_mean": round(r.raw_mean, 4), "reviews": r.n_reviews,
-                      "rank_interval": [r.rank_low, r.rank_high]}
-                     for r in ranking(run) if r.rank],
-    })
+    community = public_tallies(event)
+    rows = [{"rank": r.rank, "raw_rank": r.raw_rank, "project": r.project_id, "title": r.project.title,
+             "team": r.project.team.name, "calibrated": round(r.display, 4), "se": round(r.se, 4),
+             "raw_mean": round(r.raw_mean, 4), "reviews": r.n_reviews, "rank_interval": [r.rank_low, r.rank_high]}
+            for r in ranking(run) if r.rank]
+    body = {"event": event.slug, "published_at": event.results_published_at, "run": run.pk,
+            "input_digest": run.input_digest, "method": run.method, "projects": rows}
+    if community is not None:
+        body["community_voters"] = counted_voters(event)
+        for row in rows:
+            row["community_votes"] = community.get(row["project"], (0, 0))[0]
+    return Response(body)

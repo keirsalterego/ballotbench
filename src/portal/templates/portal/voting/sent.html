@@ -1,0 +1,8 @@
+{% extends "portal/base.html" %}
+{% block title %}Check your inbox{% endblock %}
+{% block content %}
+<h1>Check your inbox</h1>
+<p class="lede">We've sent a link for voting in {{ event.name }}. Open it in the browser you want to vote from.</p>
+<p>The link works once. If nothing arrives in a few minutes, look in your spam folder, or ask for a new link; a new one replaces the old one.</p>
+<p><a href="{% url 'gallery' %}?event={{ event.slug }}">Look at the projects while you wait</a></p>
+{% endblock %}

@@ -191,3 +191,10 @@ dl.facts dd { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* The ballot's running total stays in view while the voter scrolls. */
+.tally { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: calc(var(--step) * 4); align-items: center;
+  justify-content: space-between; background: var(--sheet); border-top: 2px solid var(--ink);
+  padding: calc(var(--step) * 3) 0; }
+.tally p { margin: 0; font-weight: 700; }
+.tally .over { color: var(--refuse); }

@@ -1,0 +1,7 @@
+{% extends "portal/base.html" %}
+{% block title %}No vote{% endblock %}
+{% block content %}
+<h1>Voting isn't open for {{ event.name }}</h1>
+<p>This event doesn't have a community vote. The judges decide the results.</p>
+<p><a href="{% url 'gallery' %}?event={{ event.slug }}">See the projects</a></p>
+{% endblock %}

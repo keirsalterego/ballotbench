@@ -1,0 +1,7 @@
+{% extends "portal/base.html" %}
+{% block title %}Too many requests{% endblock %}
+{% block content %}
+<h1>Slow down a little</h1>
+<p>That was a lot of requests from here in a short time, so this one wasn't handled. Wait a few minutes and try again.</p>
+<p class="muted">The limits are per address and per account, and they reset on their own. Nothing was changed.</p>
+{% endblock %}

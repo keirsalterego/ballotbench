@@ -1,0 +1,55 @@
+{% extends "portal/base.html" %}
+{% block title %}Vote: {{ event.name }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'gallery' %}?event={{ event.slug }}">{{ event.name }}</a></p>
+<h1>Vote for your favourite projects</h1>
+<p class="lede">You have {{ budget }} credits. Giving a project more votes costs more each time: 1 vote costs 1 credit, 2 votes cost 4, 3 votes cost 9. Spread them out, or spend them on the one you love most.</p>
+<p>The projects are in a random order made for you, so no project gets an edge from being listed first. The tallies stay hidden until the organizers publish the results after voting closes.</p>
+{% if voter.voided_at %}<p class="flag bad">The organizers took this ballot out of the count: {{ voter.voided_reason }}</p>{% endif %}
+{% if closed %}<p class="flag bad">{{ closed }}</p>{% endif %}
+{% if error %}<p class="flag bad" role="alert">{{ error|capfirst }}. Nothing was saved.</p>{% endif %}
+
+{% if rows %}
+<form method="post" class="scoresheet" id="ballot">
+  {% csrf_token %}
+  {% for row in rows %}
+  <fieldset class="bubbles">
+    <legend><a href="{% url 'project' row.project.pk %}">{{ row.project.title }}</a>
+      <span class="hint">by {{ row.project.team.name }}{% if row.project.track %}, in {{ row.project.track.name }}{% endif %}. {{ row.project.tagline|default:row.project.summary|truncatechars:140 }}</span></legend>
+    {% if row.own %}
+      <p class="muted">Your team's project, so you can't vote for it.</p>
+    {% elif choices %}
+      {% for n in choices %}<label class="bubble"><input type="radio" name="p{{ row.project.pk }}" value="{{ n }}"{% if n == row.votes %} checked{% endif %}{% if closed %} disabled{% endif %} aria-label="{{ n }} vote{{ n|pluralize }} for {{ row.project.title }}"><span>{{ n }}</span></label>{% endfor %}
+    {% else %}
+      <label class="field">Votes, 0 to {{ top }} <input type="number" name="p{{ row.project.pk }}" value="{{ row.votes }}" min="0" max="{{ top }}"{% if closed %} disabled{% endif %}></label>
+    {% endif %}
+  </fieldset>
+  {% endfor %}
+  <div class="tally">
+    <p id="spent" class="num" aria-live="polite">Spent {{ spent }} of {{ budget }} credits, {{ remaining }} left.</p>
+    {% if not closed %}<button>Save my ballot</button>{% endif %}
+  </div>
+</form>
+<script>
+// Keeps the running cost current as bubbles are filled. The server checks
+// the budget again when the ballot is saved; this is only a convenience.
+(function () {
+  var form = document.getElementById("ballot"), out = document.getElementById("spent"), budget = {{ budget }};
+  function update() {
+    var spent = 0;
+    form.querySelectorAll("input[type=radio]:checked, input[type=number]").forEach(function (input) {
+      var n = parseInt(input.value, 10) || 0;
+      spent += n * n;
+    });
+    out.textContent = "Spent " + spent + " of " + budget + " credits, " +
+      (spent > budget ? (spent - budget) + " over budget." : (budget - spent) + " left.");
+    out.classList.toggle("over", spent > budget);
+  }
+  form.addEventListener("change", update);
+  form.addEventListener("input", update);
+})();
+</script>
+{% else %}
+<p>No projects have been submitted yet. Come back once submissions close.</p>
+{% endif %}
+{% endblock %}

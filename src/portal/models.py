@@ -266,7 +266,9 @@ class Review(models.Model):
 
 class Score(models.Model):
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="scores")
-    criterion = models.ForeignKey(RubricCriterion, on_delete=models.PROTECT)
+    # RESTRICT, not PROTECT: deleting a whole event may take its scores and
+    # criteria together, but a scored criterion can't be deleted alone.
+    criterion = models.ForeignKey(RubricCriterion, on_delete=models.RESTRICT)
     value = models.SmallIntegerField()
 
     class Meta:

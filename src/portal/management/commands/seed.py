@@ -52,7 +52,9 @@ class Command(BaseCommand):
         demo, created = Event.objects.get_or_create(slug=DEMO_SLUG, defaults=dict(
             name="Demo Hack (open)", description="An open event for trying the full lifecycle.",
             submissions_open=now - timedelta(days=1), submissions_close=now + timedelta(days=14),
-            judging_open=now + timedelta(days=14), judging_close=now + timedelta(days=21)))
+            judging_open=now + timedelta(days=14), judging_close=now + timedelta(days=21),
+            voting_mode=Event.VotingMode.ACCOUNT, vote_credits=25,
+            voting_open=now + timedelta(days=14), voting_close=now + timedelta(days=21)))
         if created:
             for t in data["tracks"][:3]:
                 Track.objects.create(event=demo, name=t["name"])

@@ -1,0 +1,49 @@
+# docker compose up  ->  http://localhost:8080
+# Once the images are built, nothing here needs the network.
+name: ballotbench
+
+services:
+  db:
+    image: postgres:18.4
+    environment:
+      POSTGRES_DB: ballotbench
+      POSTGRES_USER: ballotbench
+      POSTGRES_PASSWORD: ballotbench
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ballotbench -d ballotbench"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PASSWORD: ballotbench
+      DJANGO_SECRET_KEY_FILE: /data/secret_key
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,[::1],web
+      # Fixed demo logins and tokens for the acceptance checker and the demo.
+      # Set to 0 for a real deployment and they are never created.
+      BALLOTBENCH_DEMO_SEED: "1"
+    ports:
+      - "8080:8080"
+    # Healthy once the gallery answers, which is after migrate and seed.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/projects', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+    volumes:
+      - webdata:/data
+
+volumes:
+  pgdata:
+  webdata:

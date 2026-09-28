@@ -41,6 +41,9 @@ and the seed command. This is all of them.
 | `POSTGRES_PORT` | `5432` | not set | database port |
 | `BALLOTBENCH_DEMO_SEED` | off | `"1"` | `1` loads the fixture event, the open demo event and the demo accounts with their fixed tokens on boot; anything else loads nothing |
 | `BALLOTBENCH_FIXTURES` | `/app/fixtures.json` in the image | not set | the fixture file the seed imports on every boot |
+| `BALLOTBENCH_TRUSTED_PROXIES` | `0` | not set | how many reverse proxies sit in front; the caller's address is then read from X-Forwarded-For, counting from the right |
+| `BALLOTBENCH_ADDRESS_LIMIT_SCALE` | `10` | not set | multiplies every per-address rate limit, so a venue behind one NAT address isn't locked out; per-account limits aren't scaled |
+| `DJANGO_EMAIL_BACKEND` | the database outbox | not set | Django's SMTP backend (`django.core.mail.backends.smtp.EmailBackend`, plus the usual `EMAIL_*` settings) to really send mail |
 | `WEB_WORKERS` | `3` | not set | gunicorn worker processes |
 
 If neither `DJANGO_SECRET_KEY` nor `DJANGO_SECRET_KEY_FILE` is set, and debug
@@ -387,8 +390,10 @@ run the event.
 
 ## API tokens
 
-There's no page for making tokens yet. An admin can issue one from a shell;
-the token is printed once and only its hash is stored:
+Anyone signed in issues and revokes their own tokens at `/me/tokens`; a
+token acts with that person's roles and nothing more, is shown once, and
+only its hash is stored. An admin can also issue one for any account from a
+shell:
 
 ```sh
 docker compose exec web python manage.py shell -c "

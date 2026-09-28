@@ -2,6 +2,7 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -55,6 +56,12 @@ class SignupForm(forms.Form):
     name = forms.CharField(max_length=200)
     email = forms.EmailField()
     password = forms.CharField(widget=forms.PasswordInput, min_length=10)
+
+    def clean_password(self):
+        # The same rules as the rest of Django: length and the common-password list.
+        password = self.cleaned_data["password"]
+        validate_password(password, User(email=self.data.get("email", ""), name=self.data.get("name", "")))
+        return password
 
     def clean_email(self):
         email = self.cleaned_data["email"].lower()

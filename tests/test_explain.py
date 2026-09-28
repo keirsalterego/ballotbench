@@ -84,3 +84,11 @@ def test_signed_results_exist_only_once_published_and_verify(api, web, run):
     assert not signing.verify(json.dumps(receipt))[0]
     page = web().post("/verify", {"record": json.dumps(api().get(f"/api/events/{EVENT}/results/signed").json())})
     assert "Valid" in page.content.decode()
+
+
+def test_the_verify_page_reads_signed_results_as_results(api, web, run):
+    import json
+    web("organizer").post(f"/events/{EVENT}/manage/publish")
+    receipt = api().get(f"/api/events/{EVENT}/results/signed").json()
+    page = web().post("/verify", {"record": json.dumps(receipt)}).content.decode()
+    assert "Published results of" in page and "Took part" not in page

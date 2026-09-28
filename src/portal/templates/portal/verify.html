@@ -1,11 +1,24 @@
 {% extends "portal/base.html" %}
 {% block title %}Check a record{% endblock %}
 {% block content %}
-<h1>Check a participation record</h1>
-<p>Paste a record this portal issued, from a certificate or from the API, to see whether it's genuine. The check uses only the portal's public key, so it doesn't matter who hands you the record.</p>
+<h1>Check a signed record</h1>
+<p>Paste a participation record (from a certificate or the API) or a signed copy of published results, to see whether it's genuine. The check uses only the portal's public key, so it doesn't matter who hands you the record.</p>
 {% if valid %}
 <div class="sheet">
   <p class="flag good">{{ reason }}</p>
+  {% if record.kind == "results" %}
+  <dl class="facts">
+    <dt>What</dt><dd>Published results of {{ record.event.name }}</dd>
+    <dt>Published</dt><dd>{{ record.published_at }}</dd>
+    <dt>Scores fingerprint</dt><dd><code>{{ record.input_digest }}</code></dd>
+    <dt>Signing key</dt><dd><code>{{ record.key_id }}</code></dd>
+  </dl>
+  <div class="table-wrap"><table>
+    <thead><tr><th class="num">Rank</th><th>Project</th><th class="num">Could be</th><th class="num">Score</th></tr></thead>
+    <tbody>{% for r in record.ranking %}<tr><td class="num">{{ r.rank }}</td><td>{{ r.title }}</td>
+      <td class="num">{{ r.could_be.0 }} to {{ r.could_be.1 }}</td><td class="num">{{ r.calibrated }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}
   <dl class="facts">
     <dt>Who</dt><dd>{{ record.person.name }}{% if record.person.email != record.person.name %} <span class="faint">{{ record.person.email }}</span>{% endif %}</dd>
     <dt>Event</dt><dd>{{ record.event.name }}</dd>
@@ -19,6 +32,7 @@
     <dt>Issued</dt><dd>{{ record.issued_at }}</dd>
     <dt>Signing key</dt><dd><code>{{ record.key_id }}</code></dd>
   </dl>
+  {% endif %}
 </div>
 {% elif valid is False %}
 <p class="flag bad">Not valid. {{ reason }}</p>

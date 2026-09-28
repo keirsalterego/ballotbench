@@ -1,0 +1,58 @@
+# The same three things a judge would run: our tests on real Postgres, the
+# official checker against the Docker build, and the isolation probe.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_USER: ballotbench
+          POSTGRES_PASSWORD: ballotbench
+          POSTGRES_DB: ballotbench
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ballotbench"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r src/requirements-dev.txt
+      - run: python -m pytest
+        env:
+          POSTGRES_HOST: localhost
+
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build --wait --wait-timeout 240
+      - name: Official checker
+        run: |
+          python3 run.py .dogfood.toml | tee report.txt
+          tail -1 report.txt | grep -qx "claimed T1 T2, verified T1 T2"
+      - name: Isolation probe
+        run: sh scripts/isolation_curl.sh
+      - name: Audit chain
+        run: docker compose exec -T web python manage.py verify_audit
+      - name: Fresh volume, no network
+        run: |
+          docker compose down -v
+          docker compose -f docker-compose.yml -f docker-compose.offline.yml up -d --no-build --wait --wait-timeout 240
+          docker compose exec -T web python -c "import urllib.request as u; [u.urlopen('http://localhost:8080' + p) for p in ('/projects', '/static/portal/site.css')]"
+      - if: failure()
+        run: docker compose logs

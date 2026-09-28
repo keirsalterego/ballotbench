@@ -1,0 +1,35 @@
+{% extends "portal/base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<h1>Audit log</h1>
+{% include "portal/organizer/_nav.html" %}
+<p>Every change in this event, oldest at the bottom. Rows can't be edited or deleted, and each one carries a hash of the one before it, so a gap or an edit shows up when the chain is checked.</p>
+<form method="get" class="filters">
+  <select name="action" aria-label="Kind of change">
+    <option value="">Every kind of change</option>
+    {% for a in actions %}<option value="{{ a }}"{% if a == action %} selected{% endif %}>{{ a }}</option>{% endfor %}
+  </select>
+  <input name="actor" value="{{ actor }}" placeholder="Who (email)" aria-label="Who">
+  <button class="quiet">Filter</button>
+</form>
+<div class="table-wrap"><table>
+  <thead><tr><th class="num">#</th><th>When (UTC)</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
+  <tbody>{% for a in page %}
+  <tr>
+    <td class="num">{{ a.seq }}</td>
+    <td>{{ a.ts|date:"j M H:i:s" }}</td>
+    <td>{{ a.actor.email|default:"system" }}{% if a.ip %}<span class="hint">{{ a.ip }}</span>{% endif %}</td>
+    <td>{{ a.action }}{% if a.object_type %}<span class="hint">{{ a.object_type }} {{ a.object_id }}</span>{% endif %}</td>
+    <td>{% if a.before or a.after %}<details><summary>show</summary>
+      {% if a.before %}<p>Before</p><pre>{{ a.before|pprint }}</pre>{% endif %}
+      {% if a.after %}<p>After</p><pre>{{ a.after|pprint }}</pre>{% endif %}
+      <span class="hint">hash {{ a.row_hash|truncatechars:17 }}</span></details>{% endif %}</td>
+  </tr>
+  {% empty %}<tr><td colspan="5">Nothing matches.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% if page.has_other_pages %}
+<nav class="pager">{% if page.has_previous %}<a href="?{{ query }}&amp;page={{ page.previous_page_number }}">Newer</a>{% endif %}
+  <span class="faint">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="?{{ query }}&amp;page={{ page.next_page_number }}">Older</a>{% endif %}</nav>
+{% endif %}
+{% endblock %}

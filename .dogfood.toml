@@ -1,0 +1,19 @@
+[portal]
+base_url = "http://localhost:8080"
+
+[tiers]
+claimed = ["T1", "T2"]
+pitch = "A self-hosted hackathon portal whose judging you can defend: weighted rubrics, calibrated judges, and deadlines and isolation enforced in the database."
+
+[auth]
+organizer   = "Authorization: Bearer bb_demo_organizer_5c1e0a"
+judge_a     = "Authorization: Bearer bb_demo_judge_a_8d24f1"
+judge_b     = "Authorization: Bearer bb_demo_judge_b_3a9e77"
+participant = "Authorization: Bearer bb_demo_participant_61b0c4"
+
+[routes]
+gallery      = "/projects"
+submit       = "/api/events/sample-hack-2026/projects"
+judge_scores = "/api/judge/scores"
+peer_scores  = "/api/judge/scores?judge=jdg_24"
+csv_export   = "/api/events/sample-hack-2026/export/scores.csv"

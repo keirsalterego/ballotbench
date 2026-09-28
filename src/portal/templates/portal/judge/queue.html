@@ -5,10 +5,15 @@
 {% for r in rows %}
 <section class="sheet">
   <h2>{{ r.event.name }}</h2>
+  {% if r.total %}
   <p>{{ r.done }} of {{ r.total }} done{% if r.recused %}, {{ r.recused }} stepped aside{% endif %}.
     {% if r.pending %}About {{ r.minutes }} minutes left at ten minutes a project.{% endif %}</p>
+  {% else %}
+  <p>Nothing assigned to you yet. Projects appear here once the organizer hands out reviews.</p>
+  {% endif %}
   {% if r.closed %}<p class="flag bad">{{ r.closed }}</p>{% endif %}
-  <table>
+  {% if r.total %}
+  <div class="table-wrap"><table>
     <thead><tr><th>Project</th><th>Track</th><th>State</th></tr></thead>
     <tbody>
     {% for a in r.assignments %}
@@ -19,7 +24,8 @@
     </tr>
     {% endfor %}
     </tbody>
-  </table>
+  </table></div>
+  {% endif %}
 </section>
 {% empty %}
 <p>You don't judge any event yet. An organizer can send you an invitation link.</p>

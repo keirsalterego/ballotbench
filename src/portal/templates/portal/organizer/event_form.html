@@ -1,0 +1,12 @@
+{% extends "portal/base.html" %}
+{% block title %}New event{% endblock %}
+{% block content %}
+<h1>New event</h1>
+<form method="post" class="stack">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}<label>{{ field.label }} {{ field }} {% if field.help_text %}<span class="muted">{{ field.help_text }}</span>{% endif %} {{ field.errors }}</label>{% endfor %}
+  <p class="muted">Times are UTC.</p>
+  <button>Create event</button>
+</form>
+{% endblock %}

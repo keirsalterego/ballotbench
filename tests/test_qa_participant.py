@@ -149,6 +149,21 @@ def test_take_part_lists_only_events_still_taking_submissions(web):
     assert "QA over" not in page and "Sample Hack" not in page
 
 
+def test_an_imported_event_gets_a_name_of_its_own(api, web, tmp_path):
+    bundle = api("organizer").get(f"/api/events/{EVENT}/export/bundle.json").json()
+    original = Event.objects.get(slug=EVENT).name
+    assert web("admin").post("/api/events/import?slug=qa-copy", json.dumps(bundle),
+                             content_type="application/json").status_code == 201
+    assert Event.objects.get(slug="qa-copy").name == f"{original} (imported)"
+    assert web("admin").post("/api/events/import?slug=qa-named&name=Spring+rerun", json.dumps(bundle),
+                             content_type="application/json").status_code == 201
+    assert Event.objects.get(slug="qa-named").name == "Spring rerun"
+    path = tmp_path / "bundle.json"
+    path.write_text(json.dumps(bundle))
+    call_command("import_event", str(path), slug="qa-cli", name="From the shell", stdout=io.StringIO())
+    assert Event.objects.get(slug="qa-cli").name == "From the shell"
+
+
 def test_a_refused_ballot_leaves_nobody_in_the_voter_list(web, ballot):  # noqa: F811
     event, projects = ballot
     response = web("participant").post(f"/events/{DEMO}/vote", {f"p{projects[0].pk}": "1"})

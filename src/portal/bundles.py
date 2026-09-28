@@ -109,27 +109,37 @@ def export_bundle_view(request, slug):
     return response
 
 
-def bundle_import(data, slug, actor=None):
-    """Import `data` as the new event `slug`: 409 if the slug is taken, 422
-    for anything malformed, and in either case nothing is kept."""
+def bundle_import(data, slug, actor=None, name=""):
+    """Import `data` as the new event `slug`, called `name` or else the
+    bundle's name with " (imported)", so the copy can be told from the
+    original: 409 if the slug is taken, 422 for anything malformed, and in
+    either case nothing is kept."""
     if not isinstance(data, dict):
         raise Invalid("the body must be a bundle: a JSON object")
     try:
         validate_slug(slug)
     except ValidationError:
         raise Invalid("slug: letters, digits, hyphens and underscores") from None
+    name = name.strip()
+    if len(name) > 200:
+        raise Invalid("name: at most 200 characters")
     if Event.objects.filter(slug=slug).exists():
         raise Conflict(f"there is already an event at {slug}")
     try:
         with guarded():
-            return import_event(data, slug=slug, actor=actor, new=True)
+            event, counts = import_event(data, slug=slug, actor=actor, new=True)
+            event.name = name or f"{event.name[:189]} (imported)"   # names are at most 200 characters
+            event.save(update_fields=["name"])
+            return event, counts
     except MALFORMED as exc:
         raise Invalid(f"not a valid bundle: {type(exc).__name__}: {exc}") from exc
 
 
 @extend_schema(
     request={"application/json": OpenApiTypes.OBJECT},
-    parameters=[OpenApiParameter("slug", str, required=True, description="The new event's slug")],
+    parameters=[OpenApiParameter("slug", str, required=True, description="The new event's slug"),
+                OpenApiParameter("name", str, description="The new event's name. Default: the bundle's name "
+                                                          "followed by \" (imported)\".")],
     responses={201: inline_serializer("Imported", {"event": serializers.CharField(),
                                                    "counts": serializers.DictField(child=serializers.IntegerField())})},
     description="Create a new event from a bundle (see the export). Site admins only: a bundle names people, and "
@@ -143,7 +153,8 @@ def import_bundle_view(request):
     # some other event shouldn't be able to do that to anyone on the portal.
     if not request.user.is_staff:
         raise exceptions.PermissionDenied("importing an event is for site admins")
-    event, counts = bundle_import(request.data, request.query_params.get("slug", ""), actor=request.user)
+    event, counts = bundle_import(request.data, request.query_params.get("slug", ""), actor=request.user,
+                                  name=request.query_params.get("name", ""))
     people = sorted(set(Membership.objects.filter(event=event).values_list("user__email", flat=True)))
     audit.record("event.import_people", request=request, event=event, obj=event, after={"enrolled": people})
     membership, _ = Membership.objects.get_or_create(user=request.user, event=event, role=Membership.Role.ORGANIZER)

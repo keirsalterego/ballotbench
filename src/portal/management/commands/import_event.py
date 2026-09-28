@@ -1,4 +1,4 @@
-"""manage.py import_event bundle.json --slug new-slug: a bundle (or a file in
+"""manage.py import_event bundle.json --slug new-slug [--name "New name"]: a bundle (or a file in
 the fixture's shape) as a new event, in one transaction."""
 import json
 from pathlib import Path
@@ -15,11 +15,12 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("file")
         parser.add_argument("--slug", required=True, help="the new event's slug")
+        parser.add_argument("--name", default="", help="the new event's name (default: the bundle's, plus \" (imported)\")")
 
-    def handle(self, *args, file, slug, **options):
+    def handle(self, *args, file, slug, name, **options):
         try:
             data = json.loads(Path(file).read_text())
-            event, counts = bundle_import(data, slug)
+            event, counts = bundle_import(data, slug, name=name)
         except (OSError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
         except APIException as exc:

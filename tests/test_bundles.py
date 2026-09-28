@@ -76,6 +76,8 @@ def test_round_trip_keeps_everything(api, web):
     assert copy.external_id is None
     assert Membership.objects.filter(event=copy, user__email=EMAILS["admin"], role="organizer").exists()
     second = web("admin").get("/api/events/sample-copy/export/bundle.json").json()
+    assert second["event"]["name"] == bundle["event"]["name"] + " (imported)"
+    second["event"]["name"] = bundle["event"]["name"]
     assert comparable(second) == comparable(bundle)
     # The cleared flag stays cleared: the bundle's word, not a new detection.
     assert Project.objects.get(event=copy, external_id="prj_41").duplicate_of is None

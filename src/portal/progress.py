@@ -39,6 +39,41 @@ def make_plan(event, k):
     return plan(projects, judges, existing, k)
 
 
+def podium_line(event):
+    """Where the prizes stop: the number of prizes, or the top three."""
+    return max(1, event.prizes.count() or 3)
+
+
+def contested(event):
+    """Projects whose plausible rank range (from the latest calibration run)
+    crosses the prize line: they could finish inside or outside it. One more
+    review there changes more than one anywhere else, so they come first."""
+    run = event.calibration_runs.order_by("-pk").first()
+    if run is None:
+        return None, []
+    line = podium_line(event)
+    rows = (run.projects.filter(rank__isnull=False, rank_low__lte=line, rank_high__gt=line)
+            .select_related("project").order_by("n_reviews", "rank"))
+    return run, list(rows)
+
+
+def podium_plan(event):
+    """One more review for each contested project, from the idlest eligible
+    judge, never someone who already has it or stepped aside from it."""
+    _, rows = contested(event)
+    projects, judges, existing = planner_input(event)
+    by_id = {p.id: p for p in projects}
+    new = []
+    for row in rows:
+        project = by_id.get(row.project_id)
+        if project is None:
+            continue
+        have = sum(1 for _, p, active in existing if p == project.id and active)
+        result = plan([project], judges, existing + [(j, p, True) for j, p in new], have + 1)
+        new += result.new
+    return new
+
+
 @organizer_required
 def assign(request, event):
     """GET previews a plan; POST applies it. The plan is recomputed on POST
@@ -47,6 +82,16 @@ def assign(request, event):
         k = max(1, min(10, int(request.POST.get("k") or request.GET.get("k") or event.reviews_per_project)))
     except ValueError:
         k = event.reviews_per_project
+    if request.method == "POST" and request.POST.get("focus") == "podium":
+        new = podium_plan(event)
+        with guarded():
+            JudgeAssignment.objects.bulk_create(
+                JudgeAssignment(event=event, judge_id=j, project_id=p, source=JudgeAssignment.Source.AUTO)
+                for j, p in new)
+        audit.record("assignment.podium_topup", request=request, event=event, obj=event,
+                     after={"created": len(new), "line": podium_line(event), "projects": sorted({p for _, p in new})})
+        messages.success(request, f"Handed out {len(new)} review{'s' if len(new) != 1 else ''} where the prize line is uncertain.")
+        return redirect("progress", slug=event.slug)
     result = make_plan(event, k)
     if request.method == "POST":
         with guarded():
@@ -69,6 +114,7 @@ def assign(request, event):
         "bridges": {(j, p) for j, p in result.bridges},
         "manual_judges": sorted(judges.values(), key=lambda u: u.email),
         "manual_projects": sorted(projects.values(), key=lambda p: p.title),
+        "contested_run": contested(event)[0], "contested": contested(event)[1], "line": podium_line(event),
     })
 
 

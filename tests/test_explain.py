@@ -56,3 +56,17 @@ def test_describe():
     assert describe("constant", 0, None) == "gave every project the same score"
     assert describe("ok", 0.1, 2.0) == "a generous judge who separates projects sharply"
     assert describe("ok", -0.1, 1.0) == "a harsh judge"
+
+
+def test_podium_topups_go_to_projects_that_could_cross_the_prize_line(web, run):
+    from portal.models import AuditLog, JudgeAssignment
+    from portal.progress import contested
+    _, rows = contested(run.event)
+    assert rows and all(r.rank_low <= 3 < r.rank_high for r in rows)
+    before = JudgeAssignment.objects.filter(event=run.event).count()
+    assert web("organizer").post(f"/events/{EVENT}/manage/assign", {"focus": "podium"}).status_code == 302
+    added = JudgeAssignment.objects.filter(event=run.event).order_by("-pk")[:JudgeAssignment.objects.filter(
+        event=run.event).count() - before]
+    assert {a.project_id for a in added} <= {r.project_id for r in rows}
+    assert len({a.project_id for a in added}) == len(added)          # one more each, not several
+    assert AuditLog.objects.filter(action="assignment.podium_topup").exists()

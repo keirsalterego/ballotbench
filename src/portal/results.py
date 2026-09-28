@@ -43,7 +43,7 @@ def run_calibration(event, actor=None, request=None):
         obs.append((a.judge_id, a.project_id, y))
         canon.append([r.pk, a.judge.email, a.project_id, sorted((s.criterion.key, s.value) for s in r.scores.all())])
     result = fit(obs)
-    _, _, p = signal_test(obs, shuffles=1000, seed=event.pk) if obs else (0, 0, None)
+    _, _, p = signal_test(obs, shuffles=2000, seed=1) if obs else (0, 0, None)
     run = CalibrationRun.objects.create(
         event=event, created_by=actor, method=METHOD, input_digest=digest(canon),
         params={"nu": 3.0, "ridge": 1.0, "criteria": {c.key: str(c.weight) for c in criteria}},

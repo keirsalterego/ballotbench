@@ -296,10 +296,32 @@ def test_one_ballot_per_inbox(web, ballot, mailoutbox):
     response = web().post(f"/events/{DEMO}/vote/link", {"email": "a.b+x@googlemail.com"})
     assert response.status_code == 200, "the page reads the same, so it can't tell anyone who voted"
     assert Voter.objects.filter(event=event).count() == 1
-    assert [m.to for m in mailoutbox] == [["ab@gmail.com"], ["ab@gmail.com"]], "the link goes to the first spelling"
+    assert [m.to for m in mailoutbox] == [["ab@gmail.com"], ["a.b+x@googlemail.com"]], "the link goes where it was asked"
     assert AuditLog.objects.filter(event=event, action="vote.duplicate_refused").count() == 1
     with refused(), transaction.atomic():
         Voter.objects.create(event=event, email="a.b@gmail.com", email_normalized="ab@gmail.com")
+
+
+def test_the_first_spelling_of_an_inbox_doesnt_get_its_later_links(web, ballot, mailoutbox):
+    """Some providers treat a +tag as a different inbox. Whoever asks first
+    with alice+nope@ must not receive alice@'s link, and the newest link is
+    the only one that works."""
+    event, _ = ballot
+    Event.objects.filter(pk=event.pk).update(voting_mode="email")
+    web().post(f"/events/{DEMO}/vote/link", {"email": "alice+nope@yahoo.com"}, REMOTE_ADDR="198.51.100.1")
+    web().post(f"/events/{DEMO}/vote/link", {"email": "alice@yahoo.com"}, REMOTE_ADDR="198.51.100.2")
+    assert [m.to for m in mailoutbox] == [["alice+nope@yahoo.com"], ["alice@yahoo.com"]]
+    assert web().post(link_in(mailoutbox[0])).status_code == 404, "the older link stopped working"
+    assert web().post(link_in(mailoutbox[1])).status_code == 302
+
+
+@pytest.mark.parametrize("typed", ['"ab"@gmail.com', '"a.b+x"@gmail.com'])
+def test_quoted_addresses_are_refused(web, ballot, mailoutbox, typed):
+    event, _ = ballot
+    Event.objects.filter(pk=event.pk).update(voting_mode="email")
+    response = web().post(f"/events/{DEMO}/vote/link", {"email": typed})
+    assert response.status_code == 422 and "quotation marks" in response.content.decode()
+    assert not mailoutbox and not Voter.objects.filter(event=event).exists()
 
 
 def test_email_voter_cant_vote_for_a_team_on_the_same_inbox(ballot):

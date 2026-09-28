@@ -246,21 +246,33 @@ def ballot(request, slug):
 class EmailForm(forms.Form):
     email = forms.EmailField(max_length=254, label="Your email address")
 
+    def clean_email(self):
+        """A quoted local part ("a.b"@gmail.com) is legal but reaches an
+        inbox normalize_email can't see through, so it could be a second
+        ballot. Nobody needs one to vote."""
+        email = self.cleaned_data["email"].strip()
+        if email.startswith('"'):
+            raise forms.ValidationError("Use the address without quotation marks.")
+        return email
+
 
 @require_POST
 def request_link(request, slug):
     """Mail a one-time link that opens this event's ballot. Every spelling of
     an inbox leads to one voter: a second spelling gets no second ballot
-    (it is logged as vote.duplicate_refused), and the link goes to the
-    address that signed up first, which is the same inbox. The page says the
-    same thing either way, so it can't be used to find out who voted."""
+    (it is logged as vote.duplicate_refused). The link goes to the address
+    just typed, not the one that signed up first: if a provider treats a
+    +tag as a different inbox, whoever typed that spelling first must not
+    get every later link. The link replaces the last one, so only the newest
+    request can open the ballot. The page says the same thing either way, so
+    it can't be used to find out who voted."""
     event = get_object_or_404(Event, slug=slug, voting_mode=Mode.EMAIL)
     if reason := voting_closed_reason(event):
         return render(request, "portal/closed.html", {"event": event, "reason": reason}, status=409)
     form = EmailForm(request.POST)
     if not form.is_valid():
         return render(request, "portal/voting/email.html", {"event": event, "form": form}, status=422)
-    email = form.cleaned_data["email"].strip()
+    email = form.cleaned_data["email"]
     normalized = normalize_email(email)
     try:
         ratelimit.check((ratelimit.ip_key(request, "vote-link"), *LINK_IP_LIMIT),
@@ -282,7 +294,7 @@ def request_link(request, slug):
     send_mail(f"Your ballot for {event.name}",
               f"Open this link to vote in {event.name}:\n\n{link}\n\n"
               "It works once, in the browser you open it in. If you didn't ask for it, ignore this email.",
-              None, [voter.email])
+              None, [email])
     return render(request, "portal/voting/sent.html", {"event": event})
 
 

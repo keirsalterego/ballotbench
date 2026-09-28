@@ -20,6 +20,8 @@ from .access import db_now, guarded, is_organizer, organizer_events
 from .models import Event, Membership, Prize, RoleInvite, RubricCriterion, Track
 
 ROLE_INVITE_LIFETIME = timedelta(days=7)
+# Words that appear where an event slug would in a URL (/api/events/import).
+RESERVED_SLUGS = {"import", "new", "export"}
 EVENT_FIELDS = ["name", "description", "submissions_open", "submissions_close", "judging_open", "judging_close",
                 "voting_open", "voting_close", "voting_mode", "vote_credits", "reviews_per_project", "max_team_size"]
 
@@ -56,6 +58,12 @@ class EventForm(forms.ModelForm):
                                      "who confirms an email address",
                       "vote_credits": "each voter's budget: n votes for one project cost n² credits",
                       "slug": "used in URLs; can't be changed later"}
+
+    def clean_slug(self):
+        slug = self.cleaned_data["slug"]
+        if slug in RESERVED_SLUGS:
+            raise forms.ValidationError("that name is used by the portal itself; pick another")
+        return slug
 
     def clean(self):
         data = super().clean()

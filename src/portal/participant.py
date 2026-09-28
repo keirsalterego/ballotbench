@@ -180,8 +180,8 @@ def accept_invite(request, token):
 class ProjectForm(forms.ModelForm):
     tags = forms.CharField(required=False, help_text="comma separated")
     # A URL typed without a scheme means https, as it will by default in Django 6.
-    repo_url = forms.URLField(max_length=500, required=False, assume_scheme="https")
-    demo_url = forms.URLField(max_length=500, required=False, assume_scheme="https")
+    repo_url = forms.URLField(max_length=500, required=False, assume_scheme="https", label="Code repository URL")
+    demo_url = forms.URLField(max_length=500, required=False, assume_scheme="https", label="Demo URL")
 
     class Meta:
         model = Project
@@ -211,7 +211,14 @@ def project_form(request, slug, pk=None):
     if request.method == "POST":
         if submissions_closed_reason(event):
             return closed(request, event)
+        same = project.pk is None and form.is_valid() and member.team.projects.filter(
+            title__iexact=form.cleaned_data["title"]).first()
+        if same:
+            # A double-clicked "Save" posts twice: the second one lands here.
+            messages.error(request, f"Your team already has a project called {same.title}. Edit that one instead.")
+            return redirect("project-edit", slug=slug, pk=same.pk)
         if form.is_valid():
+            was_submitted = project.status == Project.Status.SUBMITTED
             before = None if project.pk is None else audit.snapshot(Project.objects.get(pk=project.pk), PROJECT_FIELDS)
             submit = "submit" in request.POST
             try:
@@ -232,8 +239,38 @@ def project_form(request, slug, pk=None):
                          after=audit.snapshot(project, PROJECT_FIELDS))
             if submit:
                 flag_on_submit(request, event, project)
-            messages.success(request, "Submitted." if submit else "Saved as a draft.")
+            messages.success(request, "Submitted." if submit else
+                             "Saved. It stays submitted and public." if was_submitted else "Saved as a draft.")
             return redirect("event-me", slug=slug)
     return render(request, "portal/participant/project_form.html", {
         "event": event, "form": form, "project": project, "closed": submissions_closed_reason(event),
     })
+
+
+@login_required
+@require_POST
+def delete_project(request, slug, pk):
+    """A team may throw away its own draft before the deadline. A submitted
+    project stays: judges and voters may already have seen it."""
+    event = get_object_or_404(Event, slug=slug)
+    member = TeamMember.objects.filter(event=event, user=request.user).select_related("team").first()
+    if member is None:
+        raise Http404
+    project = get_object_or_404(member.team.projects, pk=pk)
+    if submissions_closed_reason(event):
+        return closed(request, event)
+    if project.status != Project.Status.DRAFT:
+        messages.error(request, "A submitted project can't be deleted. Ask the organizers if it needs to go.")
+        return redirect("event-me", slug=slug)
+    title = project.title
+    try:
+        with guarded():   # the audit row goes if the deadline trigger refuses the delete
+            audit.record("project.delete", request=request, event=event, obj=project,
+                         before=audit.snapshot(project, PROJECT_FIELDS))
+            project.delete()
+    except APIException as exc:
+        if exc.status_code == 409:
+            return closed(request, event)
+        raise
+    messages.success(request, f"Deleted the draft {title}.")
+    return redirect("event-me", slug=slug)

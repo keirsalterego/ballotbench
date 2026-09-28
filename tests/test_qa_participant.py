@@ -56,6 +56,71 @@ def test_a_team_name_already_taken_in_the_event_is_refused(me):
     assert event.teams.count() == 1
 
 
+def test_a_submitted_project_saves_changes_not_a_draft(me):
+    client, event, user = me
+    team = on_team(event, user)
+    project = Project.objects.create(event=event, team=team, title="Lamp", summary="s", status="submitted",
+                                     submitted_at=db_now())
+    url = f"/events/{event.slug}/project/{project.pk}/edit"
+    page = client.get(url).content.decode()
+    assert "Save changes" in page and "Save draft" not in page
+    response = client.post(url, {"title": "Lamp 2", "summary": "s", "save": ""})
+    assert flashed(response) == ["Saved. It stays submitted and public."]
+    assert Project.objects.get(pk=project.pk).status == "submitted"
+
+
+def test_a_team_deletes_its_own_draft_but_not_a_submitted_project(me):
+    client, event, user = me
+    team = on_team(event, user)
+    draft = Project.objects.create(event=event, team=team, title="Draft", summary="s")
+    kept = Project.objects.create(event=event, team=team, title="Kept", summary="s", status="submitted",
+                                  submitted_at=db_now())
+    assert "Delete this draft" in client.get(f"/events/{event.slug}/project/{draft.pk}/edit").content.decode()
+    assert client.post(f"/events/{event.slug}/project/{draft.pk}/delete").status_code == 302
+    assert not Project.objects.filter(pk=draft.pk).exists()
+    assert AuditLog.objects.filter(action="project.delete", object_id=str(draft.pk)).exists()
+    client.post(f"/events/{event.slug}/project/{kept.pk}/delete")
+    assert Project.objects.filter(pk=kept.pk).exists()
+
+
+def test_deleting_a_draft_after_the_deadline_is_409(me):
+    client, event, user = me
+    draft = Project.objects.create(event=event, team=on_team(event, user), title="Draft", summary="s")
+    now = db_now()
+    Event.objects.filter(pk=event.pk).update(submissions_open=now - timedelta(days=2),
+                                             submissions_close=now - timedelta(minutes=1))
+    assert client.post(f"/events/{event.slug}/project/{draft.pk}/delete").status_code == 409
+    assert Project.objects.filter(pk=draft.pk).exists()
+
+
+def test_someone_elses_draft_cant_be_deleted(me):
+    client, event, user = me
+    other = Team.objects.create(event=event, name="Other")
+    on_team(event, user)
+    draft = Project.objects.create(event=event, team=other, title="Theirs", summary="s")
+    assert client.post(f"/events/{event.slug}/project/{draft.pk}/delete").status_code == 404
+    assert Project.objects.filter(pk=draft.pk).exists()
+
+
+def test_a_double_posted_new_project_makes_one(me):
+    client, event, user = me
+    team = on_team(event, user)
+    form = {"title": "Twice", "summary": "s", "save": ""}
+    client.post(f"/events/{event.slug}/project/new", form)
+    response = client.post(f"/events/{event.slug}/project/new", form)
+    only = team.projects.get()
+    assert response.url == f"/events/{event.slug}/project/{only.pk}/edit"
+    assert any("already has a project called Twice" in m for m in flashed(response))
+
+
+def test_after_the_deadline_the_project_page_is_read_only(web):
+    own = Project.objects.filter(event__slug=EVENT, team__members__user__email=EMAILS["participant"]).first()
+    response = web("participant").get(f"/events/{EVENT}/project/{own.pk}/edit")
+    page = response.content.decode()
+    assert response.status_code == 200 and "closed" in page and own.title in page
+    assert "<button" not in page.split("<main>")[1].split("</main>")[0]
+
+
 def test_a_full_team_offers_no_invite_and_its_links_no_join_button(me, web):
     client, event, user = me
     Event.objects.filter(pk=event.pk).update(max_team_size=1)
@@ -70,3 +135,8 @@ def test_a_full_team_offers_no_invite_and_its_links_no_join_button(me, web):
     assert "This team is full." in page and "Join the team" not in page
 
 
+def test_project_form_names_its_urls_plainly(me):
+    client, event, user = me
+    on_team(event, user)
+    page = client.get(f"/events/{event.slug}/project/new").content.decode()
+    assert "Code repository URL" in page and "Demo URL" in page and "Repo url" not in page

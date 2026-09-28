@@ -26,7 +26,7 @@ next to *Demo Hack (open)*.
 In the private window, create an account, then **My events → join as a
 participant** on the demo event.
 
-- **Start a team**, then **Make an invite link**. Open it signed in as someone
+- **Create team**, then **Make an invite link**. Open it signed in as someone
   else and they join. The link then stops working; a team can't grow past the
   event's size limit, even if two people accept at the same moment.
 - **Start your project.** Save it as a draft: only the team and the organizers
@@ -81,7 +81,24 @@ the results page and API answer 404 to everyone but the organizers. The public
 page shows each project's calibrated score, its plausible rank range, and the
 fingerprint of the scores it came from.
 
-## 7. Export
+## 7. A community vote
+
+In **Settings**, set **Voting mode** to signed-in accounts and put the voting
+window after submissions close (the portal refuses it earlier). While it's
+open, **Community vote** shows how many ballots are in and who cast them,
+with flags for crowded networks, brand-new accounts and identical ballots,
+but not the per-project tallies: those appear once voting closes.
+
+A voter opens **Vote** on the event: the projects come in an order made for
+them, they spread 25 credits (n votes on a project cost n²), and they can't
+vote for their own team. An account has to confirm its email address first:
+the link is sent at sign-up, and with the network off it lands in the
+outbox, which the site admin reads under **Admin → Outbound emails**.
+
+Results can't be published while the vote is open. Close it, publish, and the
+public results show the community votes next to the judges' ranking.
+
+## 8. Export
 
 **Exports** has a CSV for every stage: registrations, teams, projects,
 assignments, every score, the calibrated results, each judge's calibration,

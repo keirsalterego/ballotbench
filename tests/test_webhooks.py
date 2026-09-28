@@ -2,6 +2,7 @@
 only to public addresses, retried with backoff, managed by organizers only."""
 import hashlib
 import hmac
+import ipaddress
 import json
 import socket
 import threading
@@ -88,10 +89,20 @@ def test_signature_verifies(event, hook):
 @pytest.mark.parametrize("url", ["http://127.0.0.1/", "http://localhost/", "http://10.1.2.3/x", "http://192.168.0.1/",
                                  "http://169.254.169.254/latest/meta-data", "http://[::1]/", "http://[fe80::1]/",
                                  "http://[::ffff:127.0.0.1]/", "http://100.64.0.1/", "http://0.0.0.0/",
-                                 "ftp://example.org/", "file:///etc/passwd", "http:///nohost"])
+                                 "ftp://example.org/", "file:///etc/passwd", "http:///nohost",
+                                 # IPv6 spellings of IPv4 addresses, and site-local IPv6
+                                 "http://[::7f00:1]/", "http://[::ffff:0:7f00:1]/", "http://[64:ff9b::a00:1]/",
+                                 "http://[64:ff9b::a9fe:a9fe]/", "http://[fec0::1]/"])
 def test_private_and_odd_urls_are_refused(url):
     with pytest.raises(webhooks.Refused):
         webhooks.resolve(url)
+
+
+def test_an_ipv4_inside_ipv6_is_judged_by_the_ipv4():
+    """NAT64 to a public address is fine; it's where the packet goes."""
+    assert webhooks.public(ipaddress.ip_address("64:ff9b::5db8:d822"))          # 93.184.216.34
+    assert webhooks.public(ipaddress.ip_address("2606:4700::1111"))
+    assert not webhooks.public(ipaddress.ip_address("::ffff:0:0"))
 
 
 def test_a_name_that_resolves_privately_is_refused(dns):

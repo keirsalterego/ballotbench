@@ -45,9 +45,21 @@ class Refused(Exception):
     pass
 
 
+# IPv6 prefixes whose last 32 bits are an IPv4 address the packet ends up at:
+# compatible (::/96), mapped, translated (SIIT) and NAT64's well-known prefix.
+IPV4_INSIDE = [ipaddress.ip_network(n) for n in ("::/96", "::ffff:0:0/96", "::ffff:0:0:0/96", "64:ff9b::/96")]
+SITE_LOCAL = ipaddress.ip_network("fec0::/10")     # deprecated, but still a private network where it's used
+
+
 def public(ip):
-    if ip.version == 6 and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
+    """Whether an address is on the public internet. An IPv6 address that
+    carries an IPv4 one is judged by the IPv4 one (ipaddress calls
+    ::127.0.0.1 or 64:ff9b::10.0.0.1 global)."""
+    if ip.version == 6:
+        if ip in SITE_LOCAL:
+            return False
+        if any(ip in net for net in IPV4_INSIDE):
+            ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     return ip.is_global and not ip.is_multicast
 
 

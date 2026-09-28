@@ -245,7 +245,7 @@ def api_results(request, slug):
              "team": r.project.team.name, "calibrated": round(r.display, 4), "se": round(r.se, 4),
              "raw_mean": round(r.raw_mean, 4), "reviews": r.n_reviews, "rank_interval": [r.rank_low, r.rank_high]}
             for r in ranking(run) if r.rank]
-    body = {"event": event.slug, "published_at": event.results_published_at.isoformat(), "run": run.pk,
+    body = {"event": event.slug, "published_at": event.results_published_at, "run": run.pk,
             "input_digest": run.input_digest, "method": run.method, "projects": rows}
     if community is not None:
         body["community_voters"] = counted_voters(event)

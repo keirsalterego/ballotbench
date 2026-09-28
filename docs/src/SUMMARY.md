@@ -6,6 +6,7 @@
 
 - [Run it in five minutes](guide/quickstart.md)
 - [A whole event, start to finish](guide/tour.md)
+- [The five-minute demo](guide/demo-script.md)
 - [For organizers](guide/organizers.md)
 - [For participants](guide/participants.md)
 - [For judges](guide/judges.md)

@@ -1,7 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from . import api, exports, judge, organizer, participant, views
+from . import api, exports, judge, organizer, participant, progress, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -33,6 +33,10 @@ urlpatterns = [
     path("events/<slug:slug>/manage/invites", organizer.create_role_invite, name="role-invite"),
     path("events/<slug:slug>/manage/invites/<int:pk>/revoke", organizer.revoke_role_invite, name="role-invite-revoke"),
     path("join/<str:token>", organizer.accept_role_invite, name="role-join"),
+    path("events/<slug:slug>/manage/assign", progress.assign, name="assign"),
+    path("events/<slug:slug>/manage/assign/manual", progress.assign_manual, name="assign-manual"),
+    path("events/<slug:slug>/manage/assign/<int:pk>/delete", progress.unassign, name="unassign"),
+    path("events/<slug:slug>/manage/progress", progress.progress, name="progress"),
 
     path("judge", judge.queue, name="judge-queue"),
     path("judge/assignments/<int:pk>", judge.assignment_page, name="judge-assignment"),

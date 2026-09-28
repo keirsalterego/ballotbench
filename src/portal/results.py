@@ -16,7 +16,7 @@ from rest_framework.response import Response
 
 from . import audit
 from .access import db_now, is_organizer
-from .calibration import digest, fit, signal_test
+from .calibration import bootstrap, digest, fit, signal_test
 from .models import CalibratedProject, CalibrationRun, Event, JudgeCalibration, Review
 from .organizer import organizer_required
 from .progress import rankable_projects
@@ -63,6 +63,9 @@ def run_calibration(event, actor=None, request=None):
         row.rank = rank
     for rank, row in enumerate(sorted(ranked, key=lambda r: (-r.raw_mean, r.project_id)), 1):
         row.raw_rank = rank
+    intervals = bootstrap(obs, rankable={r.project_id for r in ranked}) if ranked else {}
+    for row in ranked:
+        row.rank_low, row.rank_high, _ = intervals[row.project_id]
     CalibratedProject.objects.bulk_create(rows)
     JudgeCalibration.objects.bulk_create(
         JudgeCalibration(run=run, judge_id=j, n_reviews=jf.n, offset=jf.offset, scale=jf.scale, noise=jf.noise,
@@ -140,7 +143,8 @@ def results_page(request, slug):
 ResultRow = inline_serializer("ResultRow", {
     "rank": serializers.IntegerField(), "raw_rank": serializers.IntegerField(), "project": serializers.IntegerField(),
     "title": serializers.CharField(), "team": serializers.CharField(), "calibrated": serializers.FloatField(),
-    "se": serializers.FloatField(), "raw_mean": serializers.FloatField(), "reviews": serializers.IntegerField()},
+    "se": serializers.FloatField(), "raw_mean": serializers.FloatField(), "reviews": serializers.IntegerField(),
+    "rank_interval": serializers.ListField(child=serializers.IntegerField())},
     many=True)
 
 
@@ -162,6 +166,7 @@ def api_results(request, slug):
         "input_digest": run.input_digest, "method": run.method,
         "projects": [{"rank": r.rank, "raw_rank": r.raw_rank, "project": r.project_id, "title": r.project.title,
                       "team": r.project.team.name, "calibrated": round(r.display, 4), "se": round(r.se, 4),
-                      "raw_mean": round(r.raw_mean, 4), "reviews": r.n_reviews}
+                      "raw_mean": round(r.raw_mean, 4), "reviews": r.n_reviews,
+                      "rank_interval": [r.rank_low, r.rank_high]}
                      for r in ranking(run) if r.rank],
     })

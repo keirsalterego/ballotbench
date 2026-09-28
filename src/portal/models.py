@@ -303,6 +303,10 @@ class CalibratedProject(models.Model):
     se = models.FloatField()
     rank = models.PositiveIntegerField(null=True)
     raw_rank = models.PositiveIntegerField(null=True)
+    # 90% bootstrap interval for the rank: how far it could move on the same
+    # judges writing slightly different reviews.
+    rank_low = models.PositiveIntegerField(null=True)
+    rank_high = models.PositiveIntegerField(null=True)
     excluded = models.CharField(max_length=50, blank=True)
 
     class Meta:

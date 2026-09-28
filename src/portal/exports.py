@@ -83,12 +83,12 @@ def scores(event):
 def results(event):
     """The latest calibration run, ranked: raw and calibrated side by side."""
     run = event.calibration_runs.order_by("-pk").first()
-    yield ["run", "rank", "raw_rank", "project_id", "project", "reviews", "raw_mean", "calibrated", "se", "excluded",
+    yield ["run", "rank", "rank_low", "rank_high", "raw_rank", "project_id", "project", "reviews", "raw_mean", "calibrated", "se", "excluded",
            "input_digest"]
     if run is None:
         return
     for r in run.projects.select_related("project").order_by("rank", "excluded", "project_id"):
-        yield [run.pk, r.rank or "", r.raw_rank or "", r.project_id, r.project.title, r.n_reviews,
+        yield [run.pk, r.rank or "", r.rank_low or "", r.rank_high or "", r.raw_rank or "", r.project_id, r.project.title, r.n_reviews,
                f"{r.raw_mean:.4f}", f"{r.display:.4f}", f"{r.se:.4f}", r.excluded, run.input_digest]
 
 

@@ -99,6 +99,17 @@ STORAGES = {
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
+# Behind a TLS-terminating proxy, set DJANGO_SECURE=1: cookies are sent over
+# HTTPS only, browsers are told to stay on HTTPS, and the proxy's
+# X-Forwarded-Proto header is trusted. Off by default so the laptop demo works
+# on plain http://localhost.
+if env("DJANGO_SECURE") == "1":
+    SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
+    CSRF_TRUSTED_ORIGINS = [f"https://{h}" for h in ALLOWED_HOSTS if h and not h.startswith("[")]
+
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"

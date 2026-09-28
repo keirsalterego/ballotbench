@@ -58,7 +58,7 @@ def enrich_fixture_event():
     return event, pending
 
 
-def test_round_trip_keeps_everything(api):
+def test_round_trip_keeps_everything(api, web):
     event, _ = enrich_fixture_event()
     first = api("organizer").get(EXPORT)
     assert first.status_code == 200 and first["Content-Type"].startswith("application/json")
@@ -67,12 +67,15 @@ def test_round_trip_keeps_everything(api):
         a["status"] for a in bundle["assignments"]}
     assert any(s["submitted"] is False for s in bundle["scores"])
 
-    response = post_bundle(api("organizer"), bundle, "sample-copy")
+    response = post_bundle(web("admin"), bundle, "sample-copy")
+    from portal.models import AuditLog
+    enrolled = AuditLog.objects.filter(action="event.import_people").latest("seq").after["enrolled"]
+    assert "diego.herrera@example.org" in enrolled
     assert response.status_code == 201, response.content
     copy = Event.objects.get(slug="sample-copy")
     assert copy.external_id is None
-    assert Membership.objects.filter(event=copy, user__email=EMAILS["organizer"], role="organizer").exists()
-    second = api("organizer").get("/api/events/sample-copy/export/bundle.json").json()
+    assert Membership.objects.filter(event=copy, user__email=EMAILS["admin"], role="organizer").exists()
+    second = web("admin").get("/api/events/sample-copy/export/bundle.json").json()
     assert comparable(second) == comparable(bundle)
     # The cleared flag stays cleared: the bundle's word, not a new detection.
     assert Project.objects.get(event=copy, external_id="prj_41").duplicate_of is None
@@ -81,8 +84,8 @@ def test_round_trip_keeps_everything(api):
     assert len(q) >= 30 and qualities(copy) == q          # exactly, not approximately
 
 
-def test_fixture_file_imports_as_a_new_event(api):
-    response = post_bundle(api("organizer"), FIXTURES.read_text(), "fixture-copy")
+def test_fixture_file_imports_as_a_new_event(api, web):
+    response = post_bundle(web("admin"), FIXTURES.read_text(), "fixture-copy")
     assert response.status_code == 201
     counts = response.json()["counts"]
     assert counts["projects"] == 41 and counts["reviews"] == 126 and counts["duplicates"] == 1
@@ -96,13 +99,14 @@ def test_export_is_organizer_only_and_audited(api):
     assert AuditLog.objects.filter(action="export.bundle", event__slug=EVENT).exists()
 
 
-def test_import_is_for_organizers_and_admins(api):
+def test_import_is_for_site_admins_only(api, web):
     bundle = api("organizer").get(EXPORT).json()
     assert post_bundle(api(), bundle, "x1").status_code == 401
     assert post_bundle(api("participant"), bundle, "x1").status_code == 403
     assert post_bundle(api("judge_b"), bundle, "x1").status_code == 403
-    assert post_bundle(api("organizer"), bundle, EVENT).status_code == 409
-    assert post_bundle(api("organizer"), bundle, "not a slug").status_code == 422
+    assert post_bundle(api("organizer"), bundle, "x1").status_code == 403       # an organizer can't enrol people
+    assert post_bundle(web("admin"), bundle, EVENT).status_code == 409
+    assert post_bundle(web("admin"), bundle, "not a slug").status_code == 422
     assert not Event.objects.filter(slug="x1").exists()
 
 
@@ -121,9 +125,9 @@ def test_import_is_for_organizers_and_admins(api):
     lambda b: {**b, "event": {**b["event"], "max_team_size": 0}},
     lambda b: {**b, "tracks": [{"id": "t", "name": "n" * 500}]},
 ])
-def test_a_malformed_bundle_is_422_and_leaves_nothing(api, breakage):
+def test_a_malformed_bundle_is_422_and_leaves_nothing(api, web, breakage):
     bundle = api("organizer").get(EXPORT).json()
-    response = post_bundle(api("organizer"), breakage(bundle), "broken")
+    response = post_bundle(web("admin"), breakage(bundle), "broken")
     assert response.status_code == 422, response.content
     assert not Event.objects.filter(slug="broken").exists()
 

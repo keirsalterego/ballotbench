@@ -18,7 +18,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from . import audit
-from .access import Conflict, Invalid, guarded, organizer_event_or_deny, organizer_events
+from .access import Conflict, Invalid, guarded, organizer_event_or_deny
 from .importer import import_event
 from .models import Event, JudgeAssignment, Membership, Review
 
@@ -132,14 +132,20 @@ def bundle_import(data, slug, actor=None):
     parameters=[OpenApiParameter("slug", str, required=True, description="The new event's slug")],
     responses={201: inline_serializer("Imported", {"event": serializers.CharField(),
                                                    "counts": serializers.DictField(child=serializers.IntegerField())})},
-    description="Create a new event from a bundle (see the export). Site admins and organizers of any event; you "
-                "become an organizer of the new one. 409 if the slug is taken, 422 if the bundle is malformed. "
+    description="Create a new event from a bundle (see the export). Site admins only: a bundle names people, and "
+                "importing it enrols them, so it is the operator's call. You become an organizer of the new event. 409 if the slug is taken, 422 if the bundle is malformed. "
                 "One transaction: a bad bundle leaves nothing behind.")
 @api_view(["POST"])
 def import_bundle_view(request):
-    if not (request.user.is_staff or organizer_events(request.user).exists()):
-        raise exceptions.PermissionDenied("site admins and organizers only")
+    # Site admins only. A bundle names people by email, and importing one
+    # enrols them: existing accounts become judges or team members of the new
+    # event, and can then be issued signed records about it. An organizer of
+    # some other event shouldn't be able to do that to anyone on the portal.
+    if not request.user.is_staff:
+        raise exceptions.PermissionDenied("importing an event is for site admins")
     event, counts = bundle_import(request.data, request.query_params.get("slug", ""), actor=request.user)
+    people = sorted(set(Membership.objects.filter(event=event).values_list("user__email", flat=True)))
+    audit.record("event.import_people", request=request, event=event, obj=event, after={"enrolled": people})
     membership, _ = Membership.objects.get_or_create(user=request.user, event=event, role=Membership.Role.ORGANIZER)
     audit.record("role.grant", request=request, event=event, obj=membership,
                  after={"role": "organizer", "why": "imported the event"})

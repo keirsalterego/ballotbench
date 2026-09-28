@@ -10,6 +10,7 @@
   <li>
     <h2>{{ r.rank }}. <a href="{% url 'project' r.project_id %}">{{ r.project.title }}</a></h2>
     <p class="by">by {{ r.project.team.name }}{% if r.project.track %}, in {{ r.project.track.name }}{% endif %}</p>
+    {% if r.project_id in mine %}<p><a href="{% url 'explain' event.slug r.project_id %}">How your project was scored</a></p>{% endif %}
     <p class="num">Score {{ r.display|floatformat:3 }} from {{ r.n_reviews }} review{{ r.n_reviews|pluralize }}{% if r.rank_low %}; could rank anywhere from {{ r.rank_low }} to {{ r.rank_high }}{% endif %}</p>
   </li>
 {% endfor %}

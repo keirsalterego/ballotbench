@@ -2,7 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
-from . import api, apidocs, exports, judge, organizer, oversight, participant, progress, results, views
+from . import api, apidocs, explain, exports, judge, organizer, oversight, participant, progress, results, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -41,6 +41,7 @@ urlpatterns = [
     path("events/<slug:slug>/manage/calibration", results.calibration_page, name="calibration"),
     path("events/<slug:slug>/manage/publish", results.publish, name="publish"),
     path("events/<slug:slug>/results", results.results_page, name="results"),
+    path("events/<slug:slug>/results/<int:pk>", explain.explain_page, name="explain"),
     path("events/<slug:slug>/manage/audit", oversight.audit_page, name="audit"),
     path("events/<slug:slug>/manage/duplicates", oversight.duplicates, name="duplicates"),
     path("events/<slug:slug>/manage/duplicates/<int:pk>", oversight.resolve_duplicate, name="duplicate-resolve"),

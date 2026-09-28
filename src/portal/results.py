@@ -149,7 +149,12 @@ def results_page(request, slug):
     if run is None:
         return render(request, "portal/results_hidden.html", {"event": event}, status=404)
     rows = [r for r in ranking(run) if r.rank]
-    return render(request, "portal/results.html", {"event": event, "run": run, "rows": rows,
+    mine = set()
+    if request.user.is_authenticated:
+        mine = set(event.projects.filter(team__members__user=request.user).values_list("pk", flat=True))
+        if is_organizer(request.user, event):
+            mine = {r.project_id for r in rows}
+    return render(request, "portal/results.html", {"event": event, "run": run, "rows": rows, "mine": mine,
                                                    "preview": not event.published_run_id})
 
 

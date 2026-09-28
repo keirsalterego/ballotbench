@@ -158,9 +158,11 @@ they're published.
 
 ## Beyond T2 (tier T4)
 
-Not claimed in `.dogfood.toml`, because `run.py` can't check it, but built and
-tested (`tests/test_records.py`, `test_embed.py`, `test_bundles.py`,
-`test_webhooks.py`) and probed by `scripts/isolation_curl.sh`:
+`.dogfood.toml` claims T1 and T2, the tiers `run.py` can verify. The public
+vote and comments above (T3) and everything in this section (T4) are built
+and tested but not claimed, because the checker has no way to confirm them.
+T4's tests are `tests/test_records.py`, `test_embed.py`, `test_bundles.py`
+and `test_webhooks.py`, and `scripts/isolation_curl.sh` probes it:
 
 - **Signed participation records.** `GET /api/judge/record?event=<slug>`
   (and `/api/participant/record`) returns what you did in an event, never a
@@ -213,8 +215,9 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
 
 ## What it doesn't do yet
 
-- **No webhooks, certificates, signed records or embeddable widget** (T4).
-  The REST API and its OpenAPI document are there.
+- **Signed records can't be revoked, and the signing key can't be rotated
+  in place.** A new key file means records signed with the old one no longer
+  verify against the published key.
 - **No email leaves the box.** The portal runs offline, so invite links are
   shown once to whoever creates them, and voting links land in an outbox
   table that site admins read in the admin. Set `DJANGO_EMAIL_BACKEND` to
@@ -228,8 +231,8 @@ cd .. && POSTGRES_PORT=5434 .venv/bin/python -m pytest     # tests run on real P
   no CAPTCHA, no phone check and no proof of personhood; the organizer's
   judgement, helped by the flags, is the last line.
 - **Rate limits are per client address**, the same address the audit log
-  records (`audit.client_ip`). Behind a proxy that address must be the
-  visitor's, not the proxy's, or every visitor shares one limit.
+  records. Behind a reverse proxy, set `BALLOTBENCH_TRUSTED_PROXIES` to the
+  number of proxies, or every visitor shares the proxy's limit.
 - **Calibration assumes linear judges.** It can't correct a judge who only
   compresses the top of the scale, and it can't detect judges who collude.
   See [known limits](JUDGING.md#14-known-limits).

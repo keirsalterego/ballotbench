@@ -2,7 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 
-from . import api, apidocs, explain, exports, judge, organizer, oversight, participant, progress, results, views
+from . import api, apidocs, explain, exports, tokens, judge, organizer, oversight, participant, progress, results, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -12,6 +12,8 @@ urlpatterns = [
     path("logout", auth_views.LogoutView.as_view(), name="logout"),
     path("signup", views.signup, name="signup"),
     path("me", views.home, name="home"),
+    path("me/tokens", tokens.tokens, name="tokens"),
+    path("me/tokens/<int:pk>/revoke", tokens.revoke, name="token-revoke"),
     path("events/<slug:slug>/join", participant.join_event, name="event-join"),
     path("events/<slug:slug>/me", participant.event_me, name="event-me"),
     path("events/<slug:slug>/team", participant.create_team, name="team-create"),

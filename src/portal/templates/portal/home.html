@@ -22,6 +22,7 @@
 <p class="muted">You aren't in any event yet.</p>
 {% endif %}
 
+<p><a href="{% url 'tokens' %}">API tokens</a> for scripts that act as you.</p>
 {% if can_create %}<p><a class="button" href="{% url 'event-new' %}">New event</a></p>{% endif %}
 
 {% if joinable %}

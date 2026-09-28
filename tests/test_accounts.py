@@ -51,3 +51,21 @@ def test_logout_is_post_only(web):
     client = web("participant")
     assert client.get("/logout").status_code == 405
     assert client.post("/logout").status_code == 302
+
+
+def test_client_ip_trusts_only_the_configured_proxies(monkeypatch, rf):
+    from portal.audit import client_ip
+    request = rf.get("/", HTTP_X_FORWARDED_FOR="6.6.6.6, 203.0.113.9", REMOTE_ADDR="10.0.0.2")
+    assert client_ip(request) == "10.0.0.2"                    # default: no proxy trusted
+    monkeypatch.setenv("BALLOTBENCH_TRUSTED_PROXIES", "1")
+    assert client_ip(request) == "203.0.113.9"                 # what our one proxy saw, not the spoofed 6.6.6.6
+    monkeypatch.setenv("BALLOTBENCH_TRUSTED_PROXIES", "1")
+    assert client_ip(rf.get("/", HTTP_X_FORWARDED_FOR="nonsense", REMOTE_ADDR="10.0.0.2")) == "10.0.0.2"
+
+
+def test_proof_handles_an_event_with_no_reviews(db):
+    import io
+    from django.core.management import call_command
+    out = io.StringIO()
+    call_command("normalization_proof", "--event", "demo-open", stdout=out)
+    assert "nothing to calibrate" in out.getvalue()

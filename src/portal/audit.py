@@ -1,16 +1,33 @@
 """Every state change writes one audit row, in the same transaction as the
 change (requests are atomic), so there is never a change without its row or
 a row without its change."""
-from django.core.serializers.json import DjangoJSONEncoder
+import ipaddress
 import json
+import os
+
+from django.core.serializers.json import DjangoJSONEncoder
 
 from .models import AuditLog
 
 
 def client_ip(request):
-    # Behind a proxy, configure it to overwrite REMOTE_ADDR; we don't trust
-    # X-Forwarded-For from the client.
-    return request.META.get("REMOTE_ADDR") if request is not None else None
+    """The caller's address. Behind N reverse proxies, set
+    BALLOTBENCH_TRUSTED_PROXIES=N and the address the outermost of them saw is
+    taken from X-Forwarded-For, counting from the right: each proxy appends
+    the address it received from, and anything further left was written by
+    the client and can't be trusted. With 0 (the default), REMOTE_ADDR."""
+    if request is None:
+        return None
+    hops = int(os.environ.get("BALLOTBENCH_TRUSTED_PROXIES", "0") or 0)
+    forwarded = [a.strip() for a in request.META.get("HTTP_X_FORWARDED_FOR", "").split(",") if a.strip()]
+    if hops and len(forwarded) >= hops:
+        candidate = forwarded[-hops]
+        try:
+            ipaddress.ip_address(candidate)
+            return candidate
+        except ValueError:
+            pass
+    return request.META.get("REMOTE_ADDR")
 
 
 def _plain(value):

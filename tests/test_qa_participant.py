@@ -149,6 +149,15 @@ def test_take_part_lists_only_events_still_taking_submissions(web):
     assert "QA over" not in page and "Sample Hack" not in page
 
 
+def test_a_refused_ballot_leaves_nobody_in_the_voter_list(web, ballot):  # noqa: F811
+    event, projects = ballot
+    response = web("participant").post(f"/events/{DEMO}/vote", {f"p{projects[0].pk}": "1"})
+    assert response.status_code == 409
+    page = web("organizer").get(f"/events/{DEMO}/manage/voting")
+    assert page.context["counted"] == 0 and page.context["voters"] == []
+    assert "1 person opened the ballot without casting one" in page.content.decode()
+
+
 def test_signing_up_from_an_invite_doesnt_say_join_an_event(web):
     response = web().post("/signup?next=/invite/abc", {"name": "New", "email": "qa-signup@example.org",
                                                        "password": "a long enough passphrase"})

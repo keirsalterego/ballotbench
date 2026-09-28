@@ -416,8 +416,11 @@ def abuse_report(event):
     """Every voter, with the flags a person should look at: a network with
     several voters on it, an account made just before its ballot, and
     ballots cast identically by several voters. Flags are never acted on
-    automatically; plenty of honest people share an office network."""
-    voters = list(Voter.objects.filter(event=event).select_related("user").prefetch_related("votes").order_by("pk"))
+    automatically; plenty of honest people share an office network. Only
+    voters who cast a ballot are listed: opening the ballot page makes a
+    voter row, and a refused first ballot leaves one with nothing in it."""
+    voters = list(Voter.objects.filter(event=event, votes__isnull=False).distinct()
+                  .select_related("user").prefetch_related("votes").order_by("pk"))
     first_cast = dict(AuditLog.objects.filter(event=event, action="vote.cast", object_type="voter")
                       .values("object_id").annotate(first=Min("ts")).values_list("object_id", "first"))
     networks, ballots = defaultdict(list), defaultdict(list)
@@ -443,7 +446,8 @@ def abuse_report(event):
             v.flags.append("identical ballots")
     return {"voters": sorted(voters, key=lambda v: (not v.flags, v.pk)), "clusters": clusters,
             "identical": identical, "new_accounts": sum("new account" in v.flags for v in voters),
-            "duplicates": AuditLog.objects.filter(event=event, action="vote.duplicate_refused").count()}
+            "duplicates": AuditLog.objects.filter(event=event, action="vote.duplicate_refused").count(),
+            "opened": Voter.objects.filter(event=event, votes__isnull=True).count()}
 
 
 @organizer_required

@@ -136,6 +136,7 @@ they're published.
 
 | | |
 |-|-|
+| [The book](https://keirsalterego.github.io/ballotbench/) | everything below plus guides for each role, the API with examples, and running it for a real event |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | components, a request end to end, where each rule is enforced and why |
 | [DATA-MODEL.md](DATA-MODEL.md) | every table, its constraints and triggers, how data gets in and out |
 | [JUDGING.md](JUDGING.md) | assignment, scoring maths, calibration, its guarantees and limits |

@@ -148,3 +148,18 @@ def test_reserved_event_slugs_are_refused(web):
                                                      "submissions_close": "2026-10-02T00:00", "voting_mode": "off",
                                                      "vote_credits": 25})
     assert response.status_code == 200 and "used by the portal" in response.content.decode()
+
+
+def test_gallery_search_and_filters(web):
+    client = web()
+    by_title = client.get("/projects?q=glass").content.decode()
+    assert "Glass Signal" in by_title and "Small Meadow" not in by_title
+    by_team = client.get("/projects?q=northkiln").content.decode()
+    assert "Glass Signal" in by_team
+    one_event = client.get("/projects?event=demo-open").content.decode()
+    assert "Glass Signal" not in one_event
+    from portal.models import Track
+    track = Track.objects.get(event__slug=EVENT, external_id="trk_04")
+    by_track = client.get(f"/projects?event={EVENT}&track={track.pk}").content.decode()
+    assert "Glass Signal" in by_track and "Small Meadow" not in by_track
+    assert client.get("/projects?track=not-a-number").status_code == 200

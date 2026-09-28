@@ -43,14 +43,14 @@ def test_network_groups_ipv6_by_64(ip, v4_bits, want):
 def test_one_ipv6_subscriber_shares_one_limit(rf):
     addresses = ["2001:db8:0:7::1", "2001:db8:0:7::2", "2001:db8:0:7:dead:beef:1:2"]
     keys = {ratelimit.ip_key(rf.get("/", REMOTE_ADDR=a), "x") for a in addresses}
-    assert keys == {"x:2001:db8:0:7::/64"}
+    assert keys == {"addr:x:2001:db8:0:7::/64"}
 
 
 def test_login_attempts_are_limited_per_address(web):
     client = web()
     limit, _ = views.LOGIN_LIMIT
-    for _ in range(limit):
-        assert client.post("/login", {"username": EMAILS["participant"], "password": "wrong"}).status_code == 200
+    for i in range(limit):      # different accounts, so only the address limit is in play
+        assert client.post("/login", {"username": f"someone{i}@example.org", "password": "wrong"}).status_code == 200
     response = client.post("/login", {"username": EMAILS["participant"], "password": "ballotbench-demo"})
     assert response.status_code == 429 and b"Slow down" in response.content
     other = web().post("/login", {"username": EMAILS["participant"], "password": "ballotbench-demo"},

@@ -3,6 +3,8 @@ import tempfile
 
 os.environ.setdefault("DJANGO_SECRET_KEY", "tests-only")
 os.environ.setdefault("POSTGRES_PORT", "5432")
+# Tests count per-address limits exactly as written; production scales them for venues.
+os.environ.setdefault("BALLOTBENCH_ADDRESS_LIMIT_SCALE", "1")
 
 from .settings import *  # noqa: E402,F401,F403
 

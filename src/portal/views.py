@@ -77,4 +77,5 @@ def home(request):
     joinable = Event.objects.exclude(memberships__user=request.user).order_by("-submissions_close")
     return render(request, "portal/home.html", {
         "memberships": memberships, "teams": teams, "joinable": joinable,
+        "can_create": request.user.is_staff or memberships.filter(role=Membership.Role.ORGANIZER).exists(),
     })

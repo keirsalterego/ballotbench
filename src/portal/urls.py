@@ -1,7 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from . import api, exports, participant, views
+from . import api, exports, organizer, participant, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -19,6 +19,20 @@ urlpatterns = [
     path("teams/<int:pk>/invites", participant.create_invite, name="invite-create"),
     path("teams/<int:pk>/invites/<int:invite>/revoke", participant.revoke_invite, name="invite-revoke"),
     path("invite/<str:token>", participant.accept_invite, name="invite"),
+
+    path("events/new", organizer.create_event, name="event-new"),
+    path("events/<slug:slug>/manage", organizer.manage, name="manage"),
+    path("events/<slug:slug>/manage/tracks", organizer.add_track, name="track-add"),
+    path("events/<slug:slug>/manage/tracks/<int:pk>/delete", organizer.delete_track, name="track-delete"),
+    path("events/<slug:slug>/manage/prizes", organizer.add_prize, name="prize-add"),
+    path("events/<slug:slug>/manage/prizes/<int:pk>/delete", organizer.delete_prize, name="prize-delete"),
+    path("events/<slug:slug>/manage/rubric", organizer.save_criterion, name="criterion-add"),
+    path("events/<slug:slug>/manage/rubric/<int:pk>", organizer.save_criterion, name="criterion-save"),
+    path("events/<slug:slug>/manage/rubric/<int:pk>/delete", organizer.delete_criterion, name="criterion-delete"),
+    path("events/<slug:slug>/manage/judges/<int:pk>/tracks", organizer.set_judge_tracks, name="judge-tracks"),
+    path("events/<slug:slug>/manage/invites", organizer.create_role_invite, name="role-invite"),
+    path("events/<slug:slug>/manage/invites/<int:pk>/revoke", organizer.revoke_role_invite, name="role-invite-revoke"),
+    path("join/<str:token>", organizer.accept_role_invite, name="role-join"),
 
     path("api/events", api.events, name="api-events"),
     path("api/events/<slug:slug>", api.event_detail, name="api-event"),

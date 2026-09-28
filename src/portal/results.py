@@ -218,7 +218,8 @@ def api_signed_results(request, slug):
 ResultRow = inline_serializer("ResultRow", {
     "rank": serializers.IntegerField(), "raw_rank": serializers.IntegerField(), "project": serializers.IntegerField(),
     "title": serializers.CharField(), "team": serializers.CharField(), "calibrated": serializers.FloatField(),
-    "se": serializers.FloatField(), "raw_mean": serializers.FloatField(), "reviews": serializers.IntegerField(),
+    "se": serializers.FloatField(), "reviews": serializers.IntegerField(),
+    "raw_mean": serializers.FloatField(required=False, help_text="organizers only"),
     "rank_interval": serializers.ListField(child=serializers.IntegerField()),
     "community_votes": serializers.IntegerField(required=False, help_text="present once results are published "
                                                 "and the community vote has closed")},
@@ -241,9 +242,13 @@ def api_results(request, slug):
     if run is None:
         raise Http404
     community = public_tallies(event)
+    # Raw means are for organizers: where a project has two reviews, a judge
+    # who knows their own score could subtract it and read the other judge's.
+    organizer = is_organizer(request.user, event)
     rows = [{"rank": r.rank, "raw_rank": r.raw_rank, "project": r.project_id, "title": r.project.title,
              "team": r.project.team.name, "calibrated": round(r.display, 4), "se": round(r.se, 4),
-             "raw_mean": round(r.raw_mean, 4), "reviews": r.n_reviews, "rank_interval": [r.rank_low, r.rank_high]}
+             "reviews": r.n_reviews, "rank_interval": [r.rank_low, r.rank_high],
+             **({"raw_mean": round(r.raw_mean, 4)} if organizer else {})}
             for r in ranking(run) if r.rank]
     body = {"event": event.slug, "published_at": event.results_published_at, "run": run.pk,
             "input_digest": run.input_digest, "method": run.method, "projects": rows}

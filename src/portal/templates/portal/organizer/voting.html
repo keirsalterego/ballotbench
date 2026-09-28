@@ -26,7 +26,7 @@
 <ul>
   <li>{{ clusters|length }} network{{ clusters|length|pluralize }} with {{ cluster_size }} or more voters{% if clusters %}: {% for net, vs in clusters %}<code>{{ net }}</code> ({{ vs|length }}){% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}.</li>
   <li>{{ identical|length }} ballot{{ identical|length|pluralize }} cast identically by {{ cluster_size }} or more voters{% if identical %}: {% for vs in identical %}{{ vs|length }} voters ({% for v in vs %}#{{ v.pk }}{% if not forloop.last %}, {% endif %}{% endfor %}){% if not forloop.last %}; {% endif %}{% endfor %}{% endif %}.</li>
-  <li>{{ new_accounts }} account{{ new_accounts|pluralize }} created less than an hour before its first ballot.</li>
+  <li>{{ new_accounts }} account{{ new_accounts|pluralize }} created less than an hour before {{ new_accounts|pluralize:"its,their" }} first ballot.</li>
   <li>{{ duplicates }} sign-up{{ duplicates|pluralize }} refused because another spelling of the same inbox already had a ballot.</li>
 </ul>
 

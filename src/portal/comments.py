@@ -113,5 +113,5 @@ def api_comments(request, pk):
     except exceptions.APIException as exc:
         # Returned, not raised, so the rate-limit hit isn't rolled back
         # with the request (see voting.api_ballot).
-        return Response({"detail": exc.detail}, status=exc.status_code)
+        return Response(exc.detail if isinstance(exc.detail, dict) else {"detail": exc.detail}, status=exc.status_code)
     return Response(CommentSerializer(comment).data, status=201)

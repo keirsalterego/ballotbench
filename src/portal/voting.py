@@ -363,7 +363,7 @@ def api_ballot(request, slug):
                 votes[int(key)] = n
             cast(request, event, voter, votes)
         except exceptions.APIException as exc:
-            return Response({"detail": exc.detail}, status=exc.status_code)
+            return Response(exc.detail if isinstance(exc.detail, dict) else {"detail": exc.detail}, status=exc.status_code)
     return Response(ballot_data(event, voter))
 
 

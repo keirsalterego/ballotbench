@@ -36,19 +36,19 @@
 {% endif %}
 
 <h2>Ranking</h2>
-<p>Calibrated scores are on the rubric's 0 to 1 scale. The ± is one standard error: projects whose ranges overlap are close to a tie.</p>
+<p>Calibrated scores are on the rubric's 0 to 1 scale. <strong>Could be</strong> is the range the rank lands in 90% of the time when each project's reviews are resampled and everything is refitted: a wide range means the scores can't tell this project from its neighbours.</p>
 <div class="table-wrap"><table>
-  <thead><tr><th class="num">Rank</th><th class="num">Raw rank</th><th>Project</th><th class="num">Reviews</th><th class="num">Raw mean</th><th class="num">Calibrated</th><th></th></tr></thead>
+  <thead><tr><th class="num">Rank</th><th class="num">Could be</th><th class="num">Raw rank</th><th>Project</th><th class="num">Reviews</th><th class="num">Raw mean</th><th class="num">Calibrated</th></tr></thead>
   <tbody>{% for r in rows %}
   <tr{% if not r.rank %} class="out"{% endif %}>
     <td class="num">{{ r.rank|default:"" }}</td>
+    <td class="num">{% if r.rank_low %}{{ r.rank_low }} to {{ r.rank_high }}{% endif %}</td>
     <td class="num">{{ r.raw_rank|default:"" }}{% if r.moved %} <span class="{% if r.moved > 0 %}moved-up{% else %}moved-down{% endif %}">{% if r.moved > 0 %}up {{ r.moved }}{% else %}down {{ r.moved|stringformat:"d"|slice:"1:" }}{% endif %}</span>{% endif %}</td>
     <td><a href="{% url 'project' r.project_id %}">{{ r.project.title }}</a>
       {% if r.excluded %}<span class="flag">left out: {{ r.excluded }}</span>{% elif r.n_reviews < k %}<span class="flag">low coverage</span>{% endif %}</td>
     <td class="num">{{ r.n_reviews }}</td>
     <td class="num">{{ r.raw_mean|floatformat:3 }}</td>
-    <td class="num">{{ r.display|floatformat:3 }} ± {{ r.se|floatformat:3 }}</td>
-    <td></td>
+    <td class="num">{{ r.display|floatformat:3 }}</td>
   </tr>{% endfor %}</tbody>
 </table></div>
 

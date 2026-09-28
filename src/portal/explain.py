@@ -21,6 +21,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 
 from .access import is_organizer
+from .results import visible_run
 from .calibration import digest
 from .models import CalibratedProject, JudgeCalibration, Project, Review
 from .scoring import weighted_score
@@ -54,9 +55,11 @@ def explanation(run, project):
             "label": f"Judge {n}",
             "about": describe(j.flag, j.offset - typical_offset, sharpness),
             "score": y,
-            "usual": j.offset,
+            # Rounded to 0.05: exact, a judge's offset is a fingerprint that
+            # would let anyone line up "Judge 2" across different teams' pages.
+            "usual": round(j.offset * 20) / 20,
             "habit": j.offset - typical_offset,
-            "versus_usual": y - j.offset,
+            "versus_usual": y - round(j.offset * 20) / 20,
             "share": precision[r.pk] / total,
             "flag": j.flag,
         })
@@ -100,7 +103,9 @@ def explain_page(request, slug, pk):
     event = project.event
     organizer = is_organizer(request.user, event)
     on_team = request.user.is_authenticated and project.team.members.filter(user=request.user).exists()
-    run = event.published_run or (event.calibration_runs.order_by("-pk").first() if organizer else None)
+    # The same rule as the results page: nothing while a community vote is
+    # open, except for organizers.
+    run = visible_run(request.user, event)
     if run is None or not (on_team or organizer):
         raise Http404
     if not CalibratedProject.objects.filter(run=run, project=project).exists():

@@ -1,0 +1,16 @@
+{% extends "portal/base.html" %}
+{% block title %}Confirm your address{% endblock %}
+{% block content %}
+{% if invalid %}
+  <h1>This link doesn't work</h1>
+  <p>It may have expired (links last a week) or be for an address the account no longer uses.
+    {% if user.is_authenticated %}<form method="post" action="{% url 'confirm-email-send' %}" class="inline">{% csrf_token %}<button class="link">Send a new one</button></form>.{% endif %}</p>
+{% elif done %}
+  <h1>Already confirmed</h1>
+  <p>{{ email }} is confirmed. Nothing else to do.</p>
+{% else %}
+  <h1>Confirm {{ email }}</h1>
+  <p>Confirming shows this address is yours. You need it to vote in community votes.</p>
+  <form method="post">{% csrf_token %}<button>Confirm my address</button></form>
+{% endif %}
+{% endblock %}

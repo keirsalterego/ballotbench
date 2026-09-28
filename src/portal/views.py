@@ -2,16 +2,19 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth import login
-from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.core import signing
+from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 
 from . import audit, ratelimit
-from .access import is_organizer, visible_projects
+from .access import db_now, is_organizer, visible_projects
 from .comments import visible_comments
 from .models import Event, Membership, Project, TeamMember, Track, User
 
@@ -83,6 +86,50 @@ def login_page(request):
 
 
 RESET_LIMIT = (5, 3600)     # reset emails per address per hour
+CONFIRM_LIMIT = (5, 3600)   # confirmation emails per account per hour
+CONFIRM_MAX_AGE = 7 * 24 * 3600
+
+
+def confirmation_token(user):
+    # Signed, not stored: it names the account and the address it was sent
+    # to, so changing the address makes old links stop working.
+    return signing.TimestampSigner(salt="email-confirm").sign(f"{user.pk}:{user.email}")
+
+
+def send_confirmation(request, user):
+    link = request.build_absolute_uri(f"/confirm-email/{confirmation_token(user)}")
+    send_mail("Confirm your ballotbench address",
+              f"Open this link to confirm that {user.email} is yours:\n\n{link}\n\n"
+              "If you didn't sign up, ignore this message.", None, [user.email])
+
+
+@login_required
+@require_POST
+def resend_confirmation(request):
+    if not ratelimit.allow(f"confirm:{request.user.pk}", *CONFIRM_LIMIT):
+        return ratelimit.refused(request)
+    send_confirmation(request, request.user)
+    messages.success(request, f"A confirmation link is on its way to {request.user.email}.")
+    return redirect(request.POST.get("next") if url_has_allowed_host_and_scheme(
+        request.POST.get("next", ""), allowed_hosts={request.get_host()}) else "home")
+
+
+def confirm_email(request, token):
+    """GET shows a button and POST confirms, so a mail scanner that opens
+    every link doesn't confirm on the person's behalf."""
+    try:
+        pk, email = signing.TimestampSigner(salt="email-confirm").unsign(token, max_age=CONFIRM_MAX_AGE).split(":", 1)
+        user = User.objects.get(pk=pk, email=email)
+    except (signing.BadSignature, ValueError, User.DoesNotExist):
+        return render(request, "registration/confirm_email.html", {"invalid": True}, status=404)
+    if request.method == "POST" and user.email_confirmed_at is None:
+        user.email_confirmed_at = db_now()
+        user.save(update_fields=["email_confirmed_at"])
+        audit.record("user.email_confirmed", request=request, actor=user, obj=user, after={"email": user.email})
+        messages.success(request, "Address confirmed.")
+        return redirect("home")
+    return render(request, "registration/confirm_email.html", {"email": user.email,
+                                                                "done": user.email_confirmed_at is not None})
 
 
 def password_reset(request):
@@ -97,6 +144,9 @@ def password_reset(request):
 class ResetConfirm(auth_views.PasswordResetConfirmView):
     def form_valid(self, form):
         response = super().form_valid(form)
+        if form.user.email_confirmed_at is None:        # the link came to this inbox
+            form.user.email_confirmed_at = db_now()
+            form.user.save(update_fields=["email_confirmed_at"])
         audit.record("user.password_reset", request=self.request, actor=form.user, obj=form.user)
         return response
 
@@ -110,6 +160,7 @@ def signup(request):
                                         name=form.cleaned_data["name"])
         audit.record("user.signup", request=request, actor=user, obj=user, after={"email": user.email})
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        send_confirmation(request, user)
         messages.success(request, "Welcome. Join an event below, or open an invite link from your team.")
         target = request.GET.get("next", "")
         # Only follow `next` to a page on this site, never to another host.

@@ -9,8 +9,8 @@ from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-from drf_spectacular.utils import extend_schema
-from rest_framework import permissions
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import permissions, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -137,7 +137,18 @@ def results_page(request, slug):
                                                    "preview": not event.published_run_id})
 
 
-@extend_schema(description="Ranked results. 404 until published, except for the event's organizers, who see the "
+ResultRow = inline_serializer("ResultRow", {
+    "rank": serializers.IntegerField(), "raw_rank": serializers.IntegerField(), "project": serializers.IntegerField(),
+    "title": serializers.CharField(), "team": serializers.CharField(), "calibrated": serializers.FloatField(),
+    "se": serializers.FloatField(), "raw_mean": serializers.FloatField(), "reviews": serializers.IntegerField()},
+    many=True)
+
+
+@extend_schema(responses=inline_serializer("Results", {
+    "event": serializers.CharField(), "published_at": serializers.DateTimeField(allow_null=True),
+    "run": serializers.IntegerField(), "input_digest": serializers.CharField(), "method": serializers.CharField(),
+    "projects": ResultRow}),
+    description="Ranked results. 404 until published, except for the event's organizers, who see the "
                            "latest calibration run.")
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])

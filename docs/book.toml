@@ -1,0 +1,20 @@
+[book]
+title = "ballotbench"
+description = "A self-hosted hackathon portal whose judging you can defend: how to run it, how it works, and why."
+authors = ["keirsalterego"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+
+[output.html]
+site-url = "/ballotbench/"
+git-repository-url = "https://github.com/keirsalterego/ballotbench"
+edit-url-template = "https://github.com/keirsalterego/ballotbench/edit/main/docs/{path}"
+default-theme = "light"
+preferred-dark-theme = "navy"
+no-section-label = true
+
+[output.html.search]
+enable = true

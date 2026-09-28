@@ -1,0 +1,40 @@
+{% extends "portal/base.html" %}
+{% block title %}Gallery{% endblock %}
+{% block content %}
+<h1>Project gallery</h1>
+<form class="filters" method="get" role="search">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search title, summary, team, tag" aria-label="Search projects">
+  <select name="event" aria-label="Event">
+    <option value="">All events</option>
+    {% for e in events %}<option value="{{ e.slug }}"{% if e == event %} selected{% endif %}>{{ e.name }}</option>{% endfor %}
+  </select>
+  {% if tracks %}
+  <select name="track" aria-label="Track">
+    <option value="">All tracks</option>
+    {% for t in tracks %}<option value="{{ t.pk }}"{% if t.pk|stringformat:"s" == track %} selected{% endif %}>{{ t.name }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <button>Filter</button>
+</form>
+<p class="muted">{{ page.paginator.count }} submitted project{{ page.paginator.count|pluralize }}</p>
+<ul class="grid">
+{% for p in page %}
+  <li class="card">
+    <h2><a href="{% url 'project' p.pk %}">{{ p.title }}</a></h2>
+    <p class="muted">{{ p.team.name }}{% if p.track %} · {{ p.track.name }}{% endif %} · {{ p.event.name }}</p>
+    <p>{{ p.tagline|default:p.summary|truncatechars:140 }}</p>
+    {% if p.duplicate_of_id %}<span class="badge warn">possible duplicate</span>{% endif %}
+    {% for t in p.tags %}<a class="badge" href="?tag={{ t|urlencode }}">{{ t }}</a>{% endfor %}
+  </li>
+{% empty %}
+  <li class="muted">No projects match.</li>
+{% endfor %}
+</ul>
+{% if page.has_other_pages %}
+<nav class="filters">
+  {% if page.has_previous %}<a href="?{{ query }}&amp;page={{ page.previous_page_number }}">Previous</a>{% endif %}
+  <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="?{{ query }}&amp;page={{ page.next_page_number }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

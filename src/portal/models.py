@@ -68,6 +68,13 @@ class Event(models.Model):
     # don't change what the public sees until someone publishes again.
     published_run = models.ForeignKey("CalibrationRun", on_delete=models.PROTECT, null=True, blank=True,
                                       related_name="+")
+    class VotingMode(models.TextChoices):
+        OFF = "off"
+        ACCOUNT = "account", "signed-in accounts"
+        EMAIL = "email", "confirmed email addresses"
+
+    voting_mode = models.CharField(max_length=20, choices=VotingMode.choices, default=VotingMode.OFF)
+    vote_credits = models.PositiveSmallIntegerField(default=25, help_text="each voter's quadratic budget")
     reviews_per_project = models.PositiveSmallIntegerField(default=3)
     max_team_size = models.PositiveSmallIntegerField(default=4)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -372,3 +379,76 @@ class RoleInvite(models.Model):
     class Meta:
         constraints = [models.CheckConstraint(condition=Q(used_by__isnull=True) | Q(used_at__isnull=False),
                                               name="role_invite_used_has_time")]
+
+
+class Voter(models.Model):
+    """One person's ballot in one event: a signed-in account, or an email
+    address confirmed by a link. Never both, and never twice: the unique
+    constraints are per event on the account and on the normalized address
+    (so ada+x@googlemail.com and a.da@gmail.com are one voter)."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="voters")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="ballots")
+    email = models.EmailField(blank=True, help_text="as typed, for the voter's own reference")
+    email_normalized = models.CharField(max_length=254, null=True, blank=True)
+    token_hash = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_reason = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["event", "user"], name="one_ballot_per_account"),
+            models.UniqueConstraint(fields=["event", "email_normalized"], name="one_ballot_per_inbox"),
+            models.CheckConstraint(condition=Q(user__isnull=False) | Q(email_normalized__isnull=False),
+                                   name="voter_has_identity"),
+        ]
+
+
+class Vote(models.Model):
+    """n votes for a project cost n² credits. The budget is checked by a
+    trigger under a lock on the voter, so two tabs can't overspend it."""
+    voter = models.ForeignKey(Voter, on_delete=models.CASCADE, related_name="votes")
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="votes")
+    votes = models.PositiveSmallIntegerField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["voter", "project"], name="vote_unique"),
+            models.CheckConstraint(condition=Q(votes__gte=1), name="vote_positive"),
+        ]
+
+
+class Comment(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="comments")
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
+    body = models.TextField(max_length=2000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    hidden_at = models.DateTimeField(null=True, blank=True)
+    hidden_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [models.CheckConstraint(condition=~Q(body=""), name="comment_not_empty")]
+
+
+class RateHit(models.Model):
+    """One counted action, for rate limits that every worker process shares."""
+    key = models.CharField(max_length=200)
+    created_at = models.DateTimeField(db_default=Now())
+
+    class Meta:
+        indexes = [models.Index(fields=["key", "created_at"])]
+
+
+class OutboundEmail(models.Model):
+    """Mail the portal would send. With the network off there is no SMTP, so
+    it lands here and site admins read it in the admin. A deployment with
+    mail sets EMAIL_BACKEND to SMTP instead."""
+    to = models.CharField(max_length=254)
+    subject = models.CharField(max_length=300)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)

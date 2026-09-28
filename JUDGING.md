@@ -282,7 +282,30 @@ ranking. Where the two agree, trust the rank more; where they disagree, the
 project's rank depends on how you read the judges' scales, and its "could be"
 range will usually be wide as well.
 
-## 10. Publishing results
+## 10. Spending the next reviews where they matter
+
+Once a calibration has run, the assignment page lists the projects whose
+plausible rank range crosses the prize line (the number of prizes, or the top
+three): projects that could end up either side of it. **Give each of these
+one more review** adds exactly one review per contested project, from the
+idlest eligible judge. Spreading extra reviews evenly spends most of them on
+projects that can't win and can't miss; these are the ones where another
+opinion can change who wins. Run calibration again afterwards and the ranges
+narrow where it counted.
+
+## 11. Explaining a rank to the team
+
+After publication, each team can open *How your project was scored*: every
+review of their project with the judge anonymized ("Judge 2", shuffled per
+project), what that judge gave them, what that judge gives a typical project
+(their offset `a_j`), the difference, and the share of the final score that
+review carried (`(s_j²/v_j) / (1 + Σ s²/v)`), with the pull towards the middle
+as its own row. A judge who counted for nothing says why in words: gave every
+project the same score, wrote one review, or scored against the consensus.
+It shows weighted totals only, no per-criterion scores, comments or names,
+and warns if scores changed after the published run.
+
+## 12. Publishing results
 
 Results are hidden from everyone but the event's organizers until published,
 in the pages and the API (404 before then). Publishing freezes the result to
@@ -292,7 +315,7 @@ check the published ranking came from those scores. Later runs change nothing
 public until someone publishes again, and every run and publication is in the
 audit log.
 
-## 11. Known limits
+## 13. Known limits
 
 - **Linear judges only.** The model corrects a judge who is lenient or who
   spreads scores widely. It can't correct one who only compresses the top of

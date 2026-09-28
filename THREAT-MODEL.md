@@ -121,7 +121,7 @@ and what doesn't stop it.
   audit log.
 - **Doesn't stop it:** two judges who agree to push a project look like two
   judges who agree. Calibration can't tell them apart
-  ([JUDGING.md](JUDGING.md#10-known-limits)).
+  ([JUDGING.md](JUDGING.md#14-known-limits)).
 
 ### Deadline gaming
 
@@ -182,13 +182,15 @@ and what doesn't stop it.
 - **Stops it:** API tokens are random, shown once, stored as SHA-256, and
   revocable by their owner at `/me/tokens` (or by an admin). Session cookies
   are HttpOnly and SameSite=Lax, every session POST needs a CSRF token, and
-  no page can be framed except the read-only embed (below). Login
-  attempts are limited to 20 per address per 10 minutes, so a password
-  can't be guessed at network speed.
+  no page can be framed except the read-only embed (below). Logins
+  are limited per address (20 per person per 10 minutes, times
+  `BALLOTBENCH_ADDRESS_LIMIT_SCALE` for a venue behind one NAT) and to 10
+  attempts per account per 10 minutes from anywhere, so a password can't be
+  guessed at network speed.
 - **Doesn't stop it:** tokens don't expire until revoked. Plain HTTP is the
   default so the laptop demo works; behind TLS, `DJANGO_SECURE=1` turns on
-  secure cookies, HSTS and the redirect to HTTPS. The login limit is per address, so a botnet gets
-  20 guesses per address.
+  secure cookies, HSTS and the redirect to HTTPS. A botnet still gets 10 guesses per account
+  every 10 minutes; a strong password makes that useless.
 
 ### Flooding
 

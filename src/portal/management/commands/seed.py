@@ -71,7 +71,10 @@ class Command(BaseCommand):
             if not ApiToken.objects.filter(token_hash=hash_token(token)).exists():
                 issue_token(user, "demo", token)
         for user in users.values():
-            if not user.has_usable_password():
+            # A fresh row has an empty password, which Django counts as
+            # usable; an imported one has an unusable one. Set both, but never
+            # overwrite a password someone chose.
+            if not user.password or not user.has_usable_password():
                 user.set_password(DEMO_PASSWORD)
                 user.save(update_fields=["password"])
         for event in (fixture_event, demo):

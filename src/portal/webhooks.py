@@ -10,15 +10,22 @@ network (SSRF). A URL must resolve only to public addresses, checked when
 it's saved and again when it's sent; the connection then goes to the address
 that was checked, so a DNS answer that changes in between can't redirect it.
 Redirects aren't followed. BALLOTBENCH_WEBHOOKS_ALLOW_PRIVATE=1 lifts the
-address check for receivers on a private network."""
+address check for receivers on a private network.
+
+A receiver can't hold the sender either: each attempt has one deadline for
+everything, only the head of the answer is read, and the sends happen with
+no transaction or row lock held, several at once."""
 import hashlib
 import hmac
 import http.client
 import ipaddress
 import json
+import re
 import secrets
 import socket
 import ssl
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from urllib.parse import urlsplit
 
@@ -35,7 +42,10 @@ from .access import db_now
 from .models import Webhook, WebhookDelivery
 from .organizer import organizer_required
 
-TIMEOUT = 5             # seconds, for the connection and each read
+TIMEOUT = 10            # seconds for a whole attempt: connecting, sending and reading the answer's head
+MAX_HEAD = 16 * 1024    # bytes of an answer read, at most, looking for its status line; the body never is
+BATCH = 10              # deliveries sent at once, each to a different webhook
+LEASE = 120             # seconds a claimed delivery is its sender's; if the sender dies, it's due again after
 MAX_ATTEMPTS = 8
 BACKOFF = 30            # seconds before the first retry, doubled each time: the 8th try is ~1 hour after the 1st
 Status = WebhookDelivery.Status
@@ -82,32 +92,73 @@ def resolve(url):
     return parts, port, str(ips[0])
 
 
+def _left(deadline):
+    """Seconds left before the deadline, for the next socket operation."""
+    left = deadline - time.monotonic()
+    if left <= 0:
+        raise TimeoutError(f"no answer within {TIMEOUT} seconds")
+    return left
+
+
 class _PinnedHTTP(http.client.HTTPConnection):
-    def __init__(self, host, port, ip, **kwargs):
-        super().__init__(host, port, **kwargs)
-        self.ip = ip
+    def __init__(self, host, port, ip, deadline):
+        super().__init__(host, port)
+        self.ip, self.deadline = ip, deadline
 
     def connect(self):
-        self.sock = socket.create_connection((self.ip, self.port), self.timeout)
+        self.sock = socket.create_connection((self.ip, self.port), _left(self.deadline))
 
 
 class _PinnedHTTPS(http.client.HTTPSConnection):
-    def __init__(self, host, port, ip, **kwargs):
-        super().__init__(host, port, context=ssl.create_default_context(), **kwargs)
-        self.ip = ip
+    def __init__(self, host, port, ip, deadline):
+        super().__init__(host, port, context=ssl.create_default_context())
+        self.ip, self.deadline = ip, deadline
 
     def connect(self):
-        sock = socket.create_connection((self.ip, self.port), self.timeout)
+        sock = socket.create_connection((self.ip, self.port), _left(self.deadline))
+        sock.settimeout(_left(self.deadline))       # the handshake, as a whole
         self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
 
 
+STATUS_LINE = re.compile(rb"HTTP/\d\.\d (\d{3})[^\r\n]*\r\n")
+
+
+def _status(sock, deadline):
+    """The answer's status code, read from its head and no further: at most
+    MAX_HEAD bytes, each read given only what's left of the deadline.
+    Interim (1xx) answers are skipped."""
+    head = b""
+    while True:
+        rest = head
+        while b"\r\n" in rest:
+            if not (match := STATUS_LINE.match(rest)):
+                raise http.client.BadStatusLine(rest.split(b"\r\n")[0][:100].decode("latin-1"))
+            if int(match[1]) >= 200:
+                return int(match[1])
+            _, blank, rest = rest.partition(b"\r\n\r\n")
+            if not blank:
+                break
+        if len(head) >= MAX_HEAD:
+            raise http.client.HTTPException(f"no status line in the first {MAX_HEAD} bytes")
+        sock.settimeout(_left(deadline))
+        if not (chunk := sock.recv(MAX_HEAD - len(head))):
+            raise http.client.RemoteDisconnected("closed the connection without answering")
+        head += chunk
+
+
 def post(url, body, headers):
-    """POST and return the status code. No redirects: http.client has none."""
+    """POST and return the status code. No redirects (http.client has none),
+    and one deadline for the whole attempt: a socket timeout alone counts
+    each read afresh, so a receiver sending a byte every few seconds could
+    hold the sender for as long as it liked."""
+    deadline = time.monotonic() + TIMEOUT
     parts, port, ip = resolve(url)
-    connection = (_PinnedHTTPS if parts.scheme == "https" else _PinnedHTTP)(parts.hostname, port, ip, timeout=TIMEOUT)
+    connection = (_PinnedHTTPS if parts.scheme == "https" else _PinnedHTTP)(parts.hostname, port, ip, deadline)
     try:
+        connection.connect()
+        connection.sock.settimeout(_left(deadline))
         connection.request("POST", (parts.path or "/") + (f"?{parts.query}" if parts.query else ""), body, headers)
-        return connection.getresponse().status
+        return _status(connection.sock, deadline)
     finally:
         connection.close()
 
@@ -116,18 +167,24 @@ def signature(secret, body):
     return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-def attempt(delivery, send=post):
-    """Try one delivery once and record how it went."""
+def _send(delivery, send):
+    """Send one delivery once: "" if the receiver took it, else what went
+    wrong. No database here, so it can run in any thread."""
     body = json.dumps(delivery.payload, sort_keys=True, separators=(",", ":")).encode()
     headers = {"Content-Type": "application/json", "User-Agent": "ballotbench-webhooks",
                "X-Ballotbench-Action": delivery.action, "X-Ballotbench-Delivery": str(delivery.pk),
                "X-Ballotbench-Signature": signature(delivery.webhook.secret, body)}
-    delivery.attempts += 1
     try:
         code = send(delivery.webhook.url, body, headers)
-        error = "" if 200 <= code < 300 else f"answered HTTP {code}"
+        return "" if 200 <= code < 300 else f"answered HTTP {code}"
     except (Refused, OSError, ValueError, http.client.HTTPException) as exc:
-        error = f"{type(exc).__name__}: {exc}"
+        return f"{type(exc).__name__}: {exc}"
+
+
+def _record(delivery, error):
+    """Write down how an attempt went. An update, not a save, so a delivery
+    whose webhook was deleted meanwhile is simply gone."""
+    delivery.attempts += 1
     delivery.last_error = error[:500]
     if not error:
         delivery.status = Status.DELIVERED
@@ -135,24 +192,47 @@ def attempt(delivery, send=post):
         delivery.status = Status.FAILED
     else:
         delivery.next_attempt_at = db_now() + timedelta(seconds=BACKOFF * 2 ** (delivery.attempts - 1))
-    delivery.save(update_fields=["attempts", "last_error", "status", "next_attempt_at"])
+    WebhookDelivery.objects.filter(pk=delivery.pk).update(
+        attempts=delivery.attempts, last_error=delivery.last_error, status=delivery.status,
+        next_attempt_at=delivery.next_attempt_at)
+
+
+def attempt(delivery, send=post):
+    """Try one delivery once and record how it went."""
+    error = _send(delivery, send)
+    _record(delivery, error)
     return not error
 
 
 def deliver_due(send=post):
-    """Send every delivery that is due, one row lock at a time (so two
-    senders never send the same one). Returns how many were tried."""
+    """Send every delivery that is due. Each round claims up to BATCH of
+    them, the oldest due one of each of as many webhooks, by moving their
+    next_attempt_at a LEASE ahead (under SKIP LOCKED row locks, so two
+    senders never claim the same one) and commits. Then they are sent all at
+    once with no transaction or lock held, so a slow receiver holds up
+    neither the database nor, for longer than one TIMEOUT a round, the
+    others; and a sender that dies mid-send leaves them due again once the
+    lease runs out. Returns how many were tried."""
+    # ponytail: rounds wait for their slowest send; a queue per worker thread
+    # if one TIMEOUT a round of delay for everyone ever matters.
     tried = 0
     while True:
+        due = WebhookDelivery.objects.filter(status=Status.PENDING, next_attempt_at__lte=Now())
+        oldest = (due.filter(webhook__active=True).order_by("webhook_id", "next_attempt_at", "pk")
+                  .distinct("webhook_id").values("pk"))
         with transaction.atomic():
-            delivery = (WebhookDelivery.objects.select_for_update(skip_locked=True, of=("self",))
-                        .select_related("webhook")
-                        .filter(status=Status.PENDING, next_attempt_at__lte=Now(), webhook__active=True)
-                        .order_by("next_attempt_at", "pk").first())
-            if delivery is None:
-                return tried
-            attempt(delivery, send)
-            tried += 1
+            # The due conditions again: they're rechecked on a row another sender claimed meanwhile.
+            batch = list(due.select_for_update(skip_locked=True, of=("self",)).select_related("webhook")
+                         .filter(pk__in=oldest).order_by("next_attempt_at", "pk")[:BATCH])
+            WebhookDelivery.objects.filter(pk__in=[d.pk for d in batch]).update(
+                next_attempt_at=Now() + timedelta(seconds=LEASE))
+        if not batch:
+            return tried
+        with ThreadPoolExecutor(len(batch)) as pool:
+            errors = list(pool.map(_send, batch, [send] * len(batch)))
+        for delivery, error in zip(batch, errors):
+            _record(delivery, error)
+        tried += len(batch)
 
 
 # The organizer's page.

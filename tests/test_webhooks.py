@@ -6,6 +6,7 @@ import ipaddress
 import json
 import socket
 import threading
+import time
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -228,3 +229,93 @@ def test_organizers_only(web, api, event, hook, dns):
     assert made.secret not in json.dumps(list(audit.AuditLog.objects.filter(action="webhook.create").values("after")))
     organizer.post(f"{PAGE}/{hook.pk}/delete")
     assert not Webhook.objects.filter(pk=hook.pk).exists()
+
+
+@pytest.fixture
+def raw_receiver():
+    """raw_receiver(answer) is the URL of a one-shot receiver on loopback that
+    reads the request, then calls answer(send), send(bytes) writing to it."""
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def start(answer):
+        def serve():
+            try:
+                conn, _ = listener.accept()
+                with conn:
+                    conn.recv(65536)
+                    answer(conn.sendall)
+            except OSError:
+                pass                    # the sender hung up, as it should
+        threading.Thread(target=serve, daemon=True).start()
+        return f"http://127.0.0.1:{listener.getsockname()[1]}/"
+    yield start
+    listener.close()
+
+
+def drip(data, every):
+    def answer(send):
+        for byte in data:
+            time.sleep(every)
+            send(bytes([byte]))
+    return answer
+
+
+@pytest.mark.parametrize("answer, error", [
+    pytest.param(drip(b"HTTP/1.1 200 OK\r\n\r\n", every=0.3), "TimeoutError", id="slow-status-line"),
+    pytest.param(lambda send: (send(b"HTTP/1.1 200 OK\r\n"), drip(b"X-Slow: y\r\n\r\n", every=0.3)(send)), "",
+                 id="slow-headers"),
+    pytest.param(lambda send: send(b"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n"), "",
+                 id="interim-answer"),
+    pytest.param(lambda send: send(b"x" * 100_000), "HTTPException: no status line", id="endless-head"),
+])
+def test_an_attempt_has_one_deadline_and_reads_only_the_head(settings, event, monkeypatch, raw_receiver,
+                                                              answer, error):
+    """A socket timeout counts each read afresh, so a receiver dripping a byte
+    at a time within it could hold the one sender for ever."""
+    settings.WEBHOOKS_ALLOW_PRIVATE = True
+    monkeypatch.setattr(webhooks, "TIMEOUT", 2)
+    hook = Webhook.objects.create(event=event, url=raw_receiver(answer), secret="k")
+    delivery = WebhookDelivery.objects.create(webhook=hook, action="x", payload={})
+    started = time.monotonic()
+    assert webhooks.attempt(delivery) == (not error)
+    assert time.monotonic() - started < webhooks.TIMEOUT + 1
+    delivery.refresh_from_db()
+    assert delivery.last_error.startswith(error)
+
+
+def test_a_slow_receiver_holds_up_no_other(event, hook):
+    """Sends go out together, one per webhook a round: the slow one here only
+    answers once the other has been sent, which it couldn't if they queued."""
+    other = Webhook.objects.create(event=event, url="https://other.example.org/", secret="o")
+    for _ in range(3):
+        WebhookDelivery.objects.create(webhook=hook, action="x", payload={})
+    WebhookDelivery.objects.create(webhook=other, action="x", payload={})
+    other_sent = threading.Event()
+
+    def send(url, body, headers):
+        if url == other.url:
+            other_sent.set()
+            return 200
+        return 200 if other_sent.wait(timeout=3) else 504
+    started = time.monotonic()
+    assert webhooks.deliver_due(send) == 4
+    assert time.monotonic() - started < 2
+    assert set(WebhookDelivery.objects.values_list("status", flat=True)) == {"delivered"}
+
+
+def test_a_sender_that_dies_mid_send_leaves_a_lease(event, hook):
+    """The claim is committed before the send, not held open across it; if the
+    sender dies, the delivery waits out the lease and is sent again."""
+    WebhookDelivery.objects.create(webhook=hook, action="x", payload={})
+
+    def crash(*args):
+        raise RuntimeError("worker killed")
+    with pytest.raises(RuntimeError):
+        webhooks.deliver_due(crash)
+    delivery = WebhookDelivery.objects.get()
+    assert delivery.status == "pending" and delivery.attempts == 0
+    assert delivery.next_attempt_at - db_now() > timedelta(minutes=1)
+    assert webhooks.deliver_due(lambda *a: 200) == 0                          # still leased
+    WebhookDelivery.objects.update(next_attempt_at=db_now())
+    assert webhooks.deliver_due(lambda *a: 200) == 1
+    assert WebhookDelivery.objects.get().status == "delivered"

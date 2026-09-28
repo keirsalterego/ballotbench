@@ -302,3 +302,66 @@ def confirm(request, token):
     if first:
         audit.record("vote.confirm", request=request, event=event, obj=voter, after={"voter": voter.pk})
     return redirect("ballot", slug=event.slug)
+
+
+# The ballot API, for account-mode events.
+
+BallotOut = inline_serializer("Ballot", {
+    "event": serializers.CharField(), "open": serializers.BooleanField(),
+    "closed_reason": serializers.CharField(allow_null=True), "budget": serializers.IntegerField(),
+    "spent": serializers.IntegerField(), "remaining": serializers.IntegerField(),
+    "projects": inline_serializer("BallotProject", {
+        "id": serializers.IntegerField(), "title": serializers.CharField(), "team": serializers.CharField(),
+        "votes": serializers.IntegerField(), "cost": serializers.IntegerField(),
+        "own_team": serializers.BooleanField()}, many=True)})
+
+
+class BallotIn(serializers.Serializer):
+    votes = serializers.DictField(child=serializers.IntegerField(min_value=0, max_value=1000),
+                                  help_text="project id to number of votes. This is the whole ballot: "
+                                            "projects left out get none.")
+
+
+def ballot_data(event, voter):
+    chosen = ballot_of(voter)
+    closed = voting_closed_reason(event)
+    return {"event": event.slug, "open": closed is None, "closed_reason": closed, "budget": event.vote_credits,
+            "spent": cost(chosen), "remaining": event.vote_credits - cost(chosen),
+            "projects": [{"id": r["project"].pk, "title": r["project"].title, "team": r["project"].team.name,
+                          "votes": r["votes"], "cost": r["votes"] ** 2, "own_team": r["own"]}
+                         for r in ballot_rows(event, voter, chosen)]}
+
+
+@extend_schema(methods=["GET"], responses=BallotOut,
+               description="Your ballot in an event that votes by account: the projects in your own random "
+                           "order, your votes, and your budget. 404 if the event has no vote, 409 if it votes "
+                           "by email link instead.")
+@extend_schema(methods=["POST"], request=BallotIn, responses={200: BallotOut},
+               description="Replace your whole ballot. n votes cost n² credits. 409 outside the voting window, "
+                           "over budget or for your own team's project; 422 for a project not on the ballot; "
+                           "429 when rate limited.")
+@api_view(["GET", "POST"])
+def api_ballot(request, slug):
+    event = get_object_or_404(Event, slug=slug)
+    if event.voting_mode == Mode.OFF:
+        raise exceptions.NotFound("this event has no community vote")
+    if event.voting_mode == Mode.EMAIL:
+        raise Conflict("this event votes by email link: use the ballot page")
+    voter = current_voter(request, event)
+    if request.method == "POST":
+        # Refusals are returned, not raised: DRF rolls back the request's
+        # transaction on a raised error, and with it this request's
+        # rate-limit hit, which would let failed requests go uncounted.
+        try:
+            ratelimit.check(*rate_rules(request, voter))
+            body = BallotIn(data=request.data)
+            body.is_valid(raise_exception=True)
+            votes = {}
+            for key, n in body.validated_data["votes"].items():
+                if not str(key).isascii() or not str(key).isdigit():
+                    raise Invalid(f"{key!r} is not a project id")
+                votes[int(key)] = n
+            cast(request, event, voter, votes)
+        except exceptions.APIException as exc:
+            return Response({"detail": exc.detail}, status=exc.status_code)
+    return Response(ballot_data(event, voter))

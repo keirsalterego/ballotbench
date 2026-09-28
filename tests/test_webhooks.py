@@ -344,7 +344,7 @@ def test_a_webhook_stops_when_its_creator_stops_organizing(api, web, event):
     assignment = api("judge_a").get("/api/judge/assignments").json()[0]
     Event.objects.filter(pk=event.pk).update(judging_close=None)
     scores = {c["key"]: 3 for c in Client().get(f"/api/events/{EVENT}").json()["criteria"]}
-    api("judge_a").post(f"/api/judge/assignments/{assignment['id']}/review", {"scores": scores},
+    api("judge_a").post(f"/api/judge/assignments/{assignment['id']}/review", {"scores": scores, "submit": True},
                         content_type="application/json")
     assert not WebhookDelivery.objects.filter(webhook=hook).exists()
     hook.refresh_from_db()

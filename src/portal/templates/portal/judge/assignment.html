@@ -3,12 +3,16 @@
 {% block content %}
 <p><a href="{% url 'judge-queue' %}">Your reviews</a></p>
 <h1>{{ project.title }}</h1>
-<p class="lede">{{ project.tagline|default:project.summary }}</p>
+{% if project.tagline %}<p class="lede">{{ project.tagline }}</p>{% endif %}
+{% if project.summary %}<p>{{ project.summary }}</p>{% endif %}
 {% if project.description %}<div class="prose">{{ project.description|linebreaks }}</div>{% endif %}
-<p>
-  {% if project.repo_url %}<a href="{{ project.repo_url }}" rel="nofollow noopener">Repository</a>{% endif %}
-  {% if project.demo_url %}<a href="{{ project.demo_url }}" rel="nofollow noopener">Demo</a>{% endif %}
-</p>
+<dl class="facts">
+  <dt>Team</dt><dd>{{ project.team.name }}</dd>
+  {% if project.track %}<dt>Track</dt><dd>{{ project.track.name }}</dd>{% endif %}
+  {% if project.tags %}<dt>Tags</dt><dd>{{ project.tags|join:", " }}</dd>{% endif %}
+  {% if project.repo_url %}<dt>Code</dt><dd><a href="{{ project.repo_url }}" rel="nofollow noopener">{{ project.repo_url }}</a></dd>{% endif %}
+  {% if project.demo_url %}<dt>Demo</dt><dd><a href="{{ project.demo_url }}" rel="nofollow noopener">{{ project.demo_url }}</a></dd>{% endif %}
+</dl>
 
 {% if closed %}<p class="flag bad">{{ closed }}</p>{% endif %}
 {% if assignment.status == "recused" %}
@@ -29,8 +33,9 @@
   <label class="field">Comment for the organizers <span class="hint">Other judges never see it.</span>{{ form.comment }}</label>
   {% if total is not None %}<p>Weighted score so far: <strong class="num">{{ total|floatformat:3 }}</strong> on a 0 to 1 scale.</p>{% endif %}
   <div class="actions">
-    <button name="save" class="quiet">Save draft</button>
-    <button name="submit">{% if assignment.status == "done" %}Resubmit review{% else %}Submit review{% endif %}</button>
+    {% if review.submitted_at %}<button name="submit">Resubmit review</button>
+    {% else %}<button name="save" class="quiet">Save draft</button>
+    <button name="submit">Submit review</button>{% endif %}
   </div>
 </form>
 {% if assignment.status != "done" %}
@@ -38,7 +43,7 @@
   <summary>I have a conflict with this project</summary>
   <form method="post" action="{% url 'judge-recuse' assignment.pk %}">
     {% csrf_token %}
-    <label class="field">What's the conflict? <input name="reason" maxlength="500"></label>
+    <label class="field">What's the conflict? <input name="reason" maxlength="500" required></label>
     <button class="danger">Step aside</button>
   </form>
 </details>

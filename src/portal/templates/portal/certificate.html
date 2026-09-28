@@ -17,7 +17,7 @@
     <dt>Signing key</dt><dd><code>{{ doc.record.key_id }}</code></dd>
   </dl>
   <h2>Signed record</h2>
-  <p>The record below is signed by this portal. To check it, open <a href="{{ verify_url }}">{{ facts.verify_at }}</a> and paste it in, or verify it offline with the public key at <code>/.well-known/ballotbench-signing-key</code>.</p>
+  <p>The record below is signed by this portal. To check it, open <a href="{{ verify_url }}">{{ facts.verify_at }}</a> and paste it in, or verify it offline with the public key at <a href="{{ key_url }}">{{ key_url }}</a>.</p>
   <pre class="record">{{ compact }}</pre>
 </article>
 <p class="noprint faint">To keep a copy, print this page and choose Save as PDF. It fits on one sheet.</p>

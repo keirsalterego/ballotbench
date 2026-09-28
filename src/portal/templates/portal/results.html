@@ -6,6 +6,9 @@
 {% else %}<p>Published {{ event.results_published_at|date:"j F Y, H:i" }} UTC.</p>{% endif %}
 <p>Each project's score is the judges' rubric scores with every judge's habits taken out: how lenient they were, and how widely they spread their marks. Next to each rank is the range it could plausibly have landed in; where ranges overlap, the judges couldn't really tell the projects apart.</p>
 {% if community %}<p>The community vote is shown under each project. It is separate from the judges' score and doesn't change the ranking.</p>{% endif %}
+{% if prizes %}<h2>Prizes</h2>
+<ul>{% for p in prizes %}<li>{{ p.name }}{% if p.track %} <span class="muted">({{ p.track.name }})</span>{% endif %}</li>{% endfor %}</ul>
+{% endif %}
 <ol class="docket" style="display:block">
 {% for r in rows %}
   <li>
@@ -17,6 +20,6 @@
   </li>
 {% endfor %}
 </ol>
-<p class="faint">Scores fingerprint <code>{{ run.input_digest }}</code>: anyone with the scores can check this result was computed from them.
+<p class="faint">Calibration run {{ run.number }}. Scores fingerprint <code>{{ run.input_digest }}</code>: anyone with the scores can check this result was computed from them.
   {% if not preview %}A <a href="{% url 'api-results-signed' event.slug %}">signed copy of these results</a> can be checked at <a href="/verify">/verify</a>, or offline with the portal's public key, long after this page changes.{% endif %}</p>
 {% endblock %}

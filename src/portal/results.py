@@ -11,6 +11,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import permissions, serializers
@@ -22,7 +23,7 @@ from .access import db_now, is_organizer
 from .calibration import bootstrap, digest, fit, kingmakers, signal_test
 from .models import CalibratedProject, CalibrationRun, Event, JudgeCalibration, Review
 from .organizer import organizer_required
-from .progress import rankable_projects
+from .progress import podium_line, rankable_projects
 from .scoring import weighted_score
 from .voting import counted_voters, public_tallies, voting_is_open
 
@@ -91,6 +92,12 @@ def second_opinion(event, ranked):
     return {p: i for i, p in enumerate(order, 1)}
 
 
+def run_number(run):
+    """Runs are numbered per event for people: run 1 is the event's first.
+    The primary key stays in URLs and signed records."""
+    return run.event.calibration_runs.filter(pk__lte=run.pk).count()
+
+
 def ranking(run):
     return (run.projects.select_related("project__team", "project__track")
             .order_by("rank", "excluded", "-quality", "project_id"))
@@ -109,7 +116,12 @@ def calibration_page(request, event):
         row.moved = (row.raw_rank - row.rank) if row.rank and row.raw_rank else None
         row.pairwise_rank = pairwise_rank.get(row.project_id)
     judges = (run.judges.select_related("judge").order_by("flag", "judge__email") if run else [])
-    podium = max(1, event.prizes.count() or 3)
+    if run:
+        run.number = run_number(run)
+    published = event.published_run
+    if published:
+        published.number = run_number(published)
+    podium = podium_line(event)
     decisive = []
     if run:
         criteria = list(event.criteria.all())
@@ -124,7 +136,7 @@ def calibration_page(request, event):
         "event": event, "run": run, "rows": rows, "judges": judges,
         "flagged": [j for j in judges if j.flag != "ok"],
         "k": event.reviews_per_project, "decisive": decisive, "podium": podium,
-        "runs": event.calibration_runs.order_by("-pk")[:10],
+        "published": published, "rankable": any(r.rank for r in rows), "voting_open": voting_is_open(event),
     })
 
 
@@ -139,12 +151,18 @@ def publish(request, event):
         audit.record("results.unpublish", request=request, event=event, obj=event, before=before)
         messages.success(request, "Results are hidden again.")
         return redirect("calibration", slug=event.slug)
+    back = {"url": reverse("calibration", args=[event.slug]), "label": "Back to calibration and results"}
     if voting_is_open(event):
         reason = (f"Community voting for {event.name} is open until {event.voting_close:%Y-%m-%d %H:%M} UTC, "
                   "and results stay hidden until it closes. Nothing was published.")
         return render(request, "portal/closed.html", {"event": event, "reason": reason,
-                                                      "heading": "Voting is still open"}, status=409)
+                                                      "heading": "Voting is still open", "back": back}, status=409)
     run = event.calibration_runs.order_by("-pk").first() or run_calibration(event, request.user, request)
+    if not run.projects.filter(rank__isnull=False).exists():
+        return render(request, "portal/closed.html", {
+            "event": event, "heading": "Nothing to publish", "back": back,
+            "reason": "No project has a submitted review in the latest calibration run, so there is no ranking yet. "
+                      "Nothing was published."}, status=409)
     event.results_published_at, event.published_run = db_now(), run
     event.save(update_fields=["results_published_at", "published_run"])
     audit.record("results.publish", request=request, event=event, obj=event,
@@ -178,7 +196,9 @@ def results_page(request, slug):
     community = public_tallies(event)
     for r in rows:
         r.community = community.get(r.project_id, (0, 0)) if community is not None else None
+    run.number = run_number(run)
     return render(request, "portal/results.html", {"event": event, "run": run, "rows": rows, "mine": mine,
+                                                   "prizes": event.prizes.select_related("track"),
                                                    "preview": run.pk != event.published_run_id or voting_is_open(event),
                                                    "community": community is not None})
 
@@ -228,7 +248,9 @@ ResultRow = inline_serializer("ResultRow", {
 
 @extend_schema(responses=inline_serializer("Results", {
     "event": serializers.CharField(), "published_at": serializers.DateTimeField(allow_null=True),
-    "run": serializers.IntegerField(), "input_digest": serializers.CharField(), "method": serializers.CharField(),
+    "run": serializers.IntegerField(), "run_number": serializers.IntegerField(help_text="1 for the event's first "
+                                                                                     "calibration run"),
+    "input_digest": serializers.CharField(), "method": serializers.CharField(),
     "community_voters": serializers.IntegerField(required=False, help_text="as community_votes"),
     "projects": ResultRow}),
     description="Ranked results. 404 until published, and while a community vote is open, except for the "
@@ -251,7 +273,7 @@ def api_results(request, slug):
              **({"raw_mean": round(r.raw_mean, 4)} if organizer else {})}
             for r in ranking(run) if r.rank]
     body = {"event": event.slug, "published_at": event.results_published_at, "run": run.pk,
-            "input_digest": run.input_digest, "method": run.method, "projects": rows}
+            "run_number": run_number(run), "input_digest": run.input_digest, "method": run.method, "projects": rows}
     if community is not None:
         body["community_voters"] = counted_voters(event)
         for row in rows:

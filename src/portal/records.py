@@ -182,4 +182,5 @@ def certificate(request, slug):
     return render(request, "portal/certificate.html", {
         "event": event, "facts": facts, "doc": doc, "compact": compact,
         "verify_url": facts["verify_at"] + "?" + urlencode({"record": compact}),
+        "key_url": request.build_absolute_uri("/.well-known/ballotbench-signing-key"),
     })

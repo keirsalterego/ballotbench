@@ -6,7 +6,8 @@
 {% include "portal/organizer/_nav.html" %}
 <p class="lede">{{ done }} of {{ total }} reviews in ({{ pct }}%).
   {% if low %}{{ low|length }} project{{ low|length|pluralize }} {{ low|length|pluralize:"has,have" }} fewer than {{ event.reviews_per_project }} finished reviews.{% endif %}
-  {% if unfilled %}<a href="{% url 'assign' event.slug %}">Hand out {{ unfilled }} more</a>.{% endif %}</p>
+  {% if fillable %}<a href="{% url 'assign' event.slug %}">Hand out {{ fillable }} more</a>.{% endif %}
+  {% if unfillable %}{{ unfillable }} review{{ unfillable|pluralize }} can't be handed out: no eligible judge is left for {{ unfillable|pluralize:"it,them" }}.{% endif %}</p>
 <p>{% if live %}Refreshing every 20 seconds. <a href="?">Stop</a>{% else %}<a href="?live=1">Keep this page up to date</a> while judges work.{% endif %}</p>
 
 <h2>Judges</h2>
@@ -37,6 +38,7 @@
 <form method="post" action="{% url 'assign-manual' event.slug %}" class="filters">{% csrf_token %}
   <select name="judge" aria-label="Judge">{% for m in manual_judges %}<option value="{{ m.user_id }}">{{ m.user.email }}</option>{% endfor %}</select>
   <select name="project" aria-label="Project">{% for p in manual_projects %}<option value="{{ p.pk }}">{{ p.title }}</option>{% endfor %}</select>
+  <label><input type="checkbox" name="outside_tracks" value="1"> outside their tracks</label>
   <button class="quiet">Give this project to this judge</button>
 </form>
 {% if pending_assignments %}

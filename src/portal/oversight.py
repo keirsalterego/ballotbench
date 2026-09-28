@@ -22,6 +22,12 @@ def audit_page(request, event):
         rows = rows.filter(actor__email__icontains=actor)
     actions = sorted({a.split(".")[0] for a in AuditLog.objects.filter(event=event).values_list("action", flat=True).distinct()})
     page = Paginator(rows.order_by("-seq"), 50).get_page(request.GET.get("page"))
+    # A readable name where it's one query: the event itself and projects.
+    titles = dict(Project.objects.filter(event=event, pk__in=[a.object_id for a in page if a.object_type == "project"])
+                  .values_list("pk", "title"))
+    for a in page:
+        a.label = (event.slug if a.object_type == "event" and a.object_id == str(event.pk)
+                   else titles.get(int(a.object_id)) if a.object_type == "project" else None)
     query = request.GET.copy()
     query.pop("page", None)
     return render(request, "portal/organizer/audit.html", {

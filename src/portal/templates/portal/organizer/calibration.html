@@ -1,7 +1,7 @@
 {% extends "portal/base.html" %}
-{% block title %}Calibration{% endblock %}
+{% block title %}Calibration and results{% endblock %}
 {% block content %}
-<h1>Calibration</h1>
+<h1>Calibration and results</h1>
 {% include "portal/organizer/_nav.html" %}
 <p>Every judge reads the rubric a little differently. This puts them on one scale: it learns each judge's leniency,
   how strongly they separate good from weak, and how noisy they are, from the projects they share with other judges.
@@ -9,7 +9,7 @@
 <form method="post" class="actions">{% csrf_token %}<button>{% if run %}Run it again on the current scores{% else %}Run calibration{% endif %}</button></form>
 
 {% if run %}
-<h2>Run {{ run.pk }}</h2>
+<h2>Run {{ run.number }}</h2>
 <dl class="facts">
   <dt>When</dt><dd>{{ run.created_at|date:"j M Y, H:i" }} UTC{% if run.created_by %}, by {{ run.created_by.email }}{% endif %}</dd>
   <dt>Reviews read</dt><dd>{{ run.n_reviews }}</dd>
@@ -68,12 +68,16 @@
 
 <h2>Publish</h2>
 {% if event.published_run_id %}
-<p>Results from run {{ event.published_run_id }} are public since {{ event.results_published_at|date:"j M Y, H:i" }} UTC. <a href="{% url 'results' event.slug %}">See the public page</a>.</p>
+<p>Results from run {{ published.number }} are public since {{ event.results_published_at|date:"j M Y, H:i" }} UTC. <a href="{% url 'results' event.slug %}">See the public page</a>.</p>
 <form method="post" action="{% url 'publish' event.slug %}" class="actions">{% csrf_token %}
-  {% if event.published_run_id != run.pk %}<button>Publish run {{ run.pk }} instead</button>{% endif %}
+  {% if event.published_run_id != run.pk and rankable and not voting_open %}<button>Publish run {{ run.number }} instead</button>{% endif %}
   <button class="danger" name="action" value="unpublish">Hide the results again</button></form>
+{% elif not rankable %}
+<p>Nothing to publish yet: no project in this run has a submitted review, so there is no ranking.</p>
+{% elif voting_open %}
+<p>Results can't be published while the community vote is open (until {{ event.voting_close|date:"j M Y, H:i" }} UTC), so nobody votes with the judges' ranking in front of them.</p>
 {% else %}
-<p>Nobody but the organizers can see this ranking yet. Publishing freezes it to run {{ run.pk }}.</p>
+<p>Nobody but the organizers can see this ranking yet. Publishing freezes it to run {{ run.number }}.</p>
 <form method="post" action="{% url 'publish' event.slug %}">{% csrf_token %}<button>Publish results</button></form>
 {% endif %}
 {% endif %}

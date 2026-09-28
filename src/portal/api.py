@@ -48,6 +48,7 @@ def save_project(request, event, project, data, *, created):
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def events(request):
+    """All events, newest deadline first. Open to anyone."""
     return Response(EventSerializer(Event.objects.order_by("-submissions_close"), many=True).data)
 
 
@@ -55,6 +56,7 @@ def events(request):
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def event_detail(request, slug):
+    """One event: its dates, voting mode and settings. Open to anyone."""
     return Response(EventSerializer(get_object_or_404(Event, slug=slug)).data)
 
 
@@ -65,6 +67,7 @@ def event_detail(request, slug):
 @api_view(["GET", "POST"])
 @permission_classes([permissions.AllowAny])
 def event_projects(request, slug):
+    """The event's projects you can see: submitted ones for everyone, drafts for their team and the organizers."""
     event = get_object_or_404(Event, slug=slug)
     if request.method == "GET":
         projects = visible_projects(request.user).filter(event=event).select_related("event", "team").order_by("pk")
@@ -86,6 +89,7 @@ def event_projects(request, slug):
 @api_view(["GET", "PATCH"])
 @permission_classes([permissions.AllowAny])
 def project_detail(request, pk):
+    """One project. 404 if you can't see it."""
     project = get_object_or_404(visible_projects(request.user).select_related("event", "team"), pk=pk)
     event = project.event
     if request.method == "GET":

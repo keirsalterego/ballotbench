@@ -1,0 +1,7 @@
+# The stack with no route to the outside world, to prove nothing at runtime
+# needs the network:
+#   docker compose -f docker-compose.yml -f docker-compose.offline.yml up
+# To go back: docker compose up --force-recreate
+networks:
+  default:
+    internal: true

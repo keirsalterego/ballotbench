@@ -82,6 +82,25 @@ def login_page(request):
     return auth_views.LoginView.as_view()(request)
 
 
+RESET_LIMIT = (5, 3600)     # reset emails per address per hour
+
+
+def password_reset(request):
+    """Django's reset flow, rate limited, with mail going wherever mail goes
+    (the outbox offline). It's also the way back for someone whose address was
+    signed up by somebody else: the link goes to the inbox, not the squatter."""
+    if request.method == "POST" and not ratelimit.allow(ratelimit.ip_key(request, "reset"), *RESET_LIMIT):
+        return ratelimit.refused(request)
+    return auth_views.PasswordResetView.as_view()(request)
+
+
+class ResetConfirm(auth_views.PasswordResetConfirmView):
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        audit.record("user.password_reset", request=self.request, actor=form.user, obj=form.user)
+        return response
+
+
 def signup(request):
     form = SignupForm(request.POST or None)
     if request.method == "POST" and not ratelimit.allow(ratelimit.ip_key(request, "signup"), *SIGNUP_LIMIT):

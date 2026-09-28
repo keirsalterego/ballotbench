@@ -10,5 +10,6 @@
   <input type="hidden" name="next" value="{{ next }}">
   <button>Log in</button>
 </form>
+<p class="muted"><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
 <p class="muted">No account? <a href="{% url 'signup' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Sign up</a>.</p>
 {% endblock %}

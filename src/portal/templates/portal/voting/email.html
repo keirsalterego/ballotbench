@@ -1,0 +1,13 @@
+{% extends "portal/base.html" %}
+{% block title %}Vote: {{ event.name }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'gallery' %}?event={{ event.slug }}">{{ event.name }}</a></p>
+<h1>Vote for your favourite projects</h1>
+<p class="lede">Anyone with an email address can vote, once. Type yours and we'll send you a link that opens your ballot.</p>
+<form method="post" action="{% url 'vote-link' event.slug %}" class="stack">
+  {% csrf_token %}
+  <label>{{ form.email.label }} {{ form.email }} {{ form.email.errors }}</label>
+  <button>Send me a link</button>
+</form>
+<p class="muted">Addresses that reach the same inbox count as one voter: a.b+hack@googlemail.com is the same as ab@gmail.com. We use your address only to send this link and to keep it to one ballot per person.</p>
+{% endblock %}

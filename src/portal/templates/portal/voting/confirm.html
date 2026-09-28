@@ -1,0 +1,12 @@
+{% extends "portal/base.html" %}
+{% block title %}Open your ballot{% endblock %}
+{% block content %}
+{% if invalid %}
+<h1>That link doesn't work any more</h1>
+<p>It has been used already, or a newer link replaced it. Ask for a new one on the event's voting page.</p>
+{% else %}
+<h1>Open your ballot for {{ event.name }}</h1>
+<p>This confirms {{ voter.email }} and opens its ballot in this browser.</p>
+<form method="post">{% csrf_token %}<button>Open my ballot</button></form>
+{% endif %}
+{% endblock %}

@@ -334,7 +334,10 @@ class AuditLog(models.Model):
     ip = models.GenericIPAddressField(null=True, blank=True)
     prev_hash = models.CharField(max_length=64, blank=True)
     row_hash = models.CharField(max_length=64, blank=True)
+    # Chain position, given out by the trigger under a lock. The primary key
+    # can't be the chain order: ids are handed out before the lock is taken.
+    seq = models.BigIntegerField(unique=True, null=True, blank=True)
 
     class Meta:
-        ordering = ["-pk"]
+        ordering = ["-seq"]
         indexes = [models.Index(fields=["event", "action"])]

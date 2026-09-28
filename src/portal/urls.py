@@ -28,6 +28,7 @@ urlpatterns = [
     path("events/<slug:slug>/team", participant.create_team, name="team-create"),
     path("events/<slug:slug>/project/new", participant.project_form, name="project-new"),
     path("events/<slug:slug>/project/<int:pk>/edit", participant.project_form, name="project-edit"),
+    path("events/<slug:slug>/project/<int:pk>/delete", participant.delete_project, name="project-delete"),
     path("teams/<int:pk>/invites", participant.create_invite, name="invite-create"),
     path("teams/<int:pk>/invites/<int:invite>/revoke", participant.revoke_invite, name="invite-revoke"),
     path("invite/<str:token>", participant.accept_invite, name="invite"),

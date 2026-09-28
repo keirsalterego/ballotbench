@@ -29,5 +29,28 @@
 {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
 {% block content %}{% endblock %}
 </main>
+<script>
+/* One click, one post: disable a form's buttons once it's sent. The pressed
+   button's name goes along in a hidden field, since a disabled button's
+   doesn't. Buttons come back after a few seconds (a download doesn't leave
+   the page) or when the page is shown again from the back button. */
+document.addEventListener("submit", function (e) {
+  var form = e.target, button = e.submitter;
+  if (e.defaultPrevented || form.method !== "post") return;
+  if (button && button.name) {
+    var field = document.createElement("input");
+    field.type = "hidden"; field.name = button.name; field.value = button.value;
+    form.appendChild(field);
+    setTimeout(function () { field.remove(); }, 5000);
+  }
+  var buttons = form.querySelectorAll("button, input[type=submit]");
+  buttons.forEach(function (b) { b.disabled = true; });
+  setTimeout(function () { buttons.forEach(function (b) { b.disabled = false; }); }, 5000);
+});
+window.addEventListener("pageshow", function (e) {
+  if (e.persisted) document.querySelectorAll("form button[disabled], form input[type=submit][disabled]")
+    .forEach(function (b) { b.disabled = false; });
+});
+</script>
 </body>
 </html>

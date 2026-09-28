@@ -27,6 +27,10 @@ def _hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def team_is_full(team):
+    return team.members.count() >= team.event.max_team_size
+
+
 def closed(request, event, template="portal/closed.html"):
     """The page for a write refused because the window is shut: 409."""
     return render(request, template, {"event": event, "reason": submissions_closed_reason(event)}, status=409)
@@ -60,13 +64,15 @@ def event_me(request, slug):
         "members": team.members.select_related("user") if team else [],
         "projects": team.projects.all() if team else [],
         "invites": team.invites.filter(used_at__isnull=True, expires_at__gt=db_now()) if team else [],
-        "closed": submissions_closed_reason(event),
+        "closed": submissions_closed_reason(event), "full": team is not None and team_is_full(team),
         "new_link": request.session.pop("new_invite_link", None),
     })
 
 
 class TeamForm(forms.Form):
-    name = forms.CharField(max_length=200)
+    name = forms.CharField(max_length=200, error_messages={
+        "required": "A team needs a name.",
+        "max_length": "A team name can be at most %(limit_value)d characters (this one has %(show_value)d)."})
 
 
 @login_required
@@ -79,11 +85,16 @@ def create_team(request, slug):
         return closed(request, event)
     form = TeamForm(request.POST)
     if not form.is_valid():
-        messages.error(request, "A team needs a name.")
+        messages.error(request, form.errors["name"][0])
+        return redirect("event-me", slug=slug)
+    name = form.cleaned_data["name"]
+    if event.teams.filter(name__iexact=name).exists():
+        messages.error(request, f"There's already a team called {name} in this event. Pick another name, "
+                                "or ask that team for an invite link.")
         return redirect("event-me", slug=slug)
     try:
         with guarded():
-            team = Team.objects.create(event=event, name=form.cleaned_data["name"])
+            team = Team.objects.create(event=event, name=name)
             TeamMember.objects.create(team=team, event=event, user=request.user)
     except APIException as exc:
         messages.error(request, str(exc.detail))
@@ -110,6 +121,9 @@ def create_invite(request, pk):
     team = _my_team(request, pk)
     if submissions_closed_reason(team.event):
         return closed(request, team.event)
+    if team_is_full(team):
+        messages.error(request, "Your team is full, so there's nobody left to invite.")
+        return redirect("event-me", slug=team.event.slug)
     token = secrets.token_urlsafe(24)
     expires = min(db_now() + INVITE_LIFETIME, team.event.submissions_close)
     invite = TeamInvite.objects.create(team=team, token_hash=_hash(token), created_by=request.user, expires_at=expires)
@@ -138,7 +152,8 @@ def accept_invite(request, token):
     if not request.user.is_authenticated:
         return render(request, "portal/participant/invite.html", {"team": team, "event": event, "anonymous": True})
     if request.method != "POST":
-        return render(request, "portal/participant/invite.html", {"team": team, "event": event})
+        full = "This team is full." if team_is_full(team) else None
+        return render(request, "portal/participant/invite.html", {"team": team, "event": event, "error": full})
     if submissions_closed_reason(event):
         return closed(request, event)
     try:
@@ -165,8 +180,8 @@ def accept_invite(request, token):
 class ProjectForm(forms.ModelForm):
     tags = forms.CharField(required=False, help_text="comma separated")
     # A URL typed without a scheme means https, as it will by default in Django 6.
-    repo_url = forms.URLField(max_length=500, required=False, assume_scheme="https")
-    demo_url = forms.URLField(max_length=500, required=False, assume_scheme="https")
+    repo_url = forms.URLField(max_length=500, required=False, assume_scheme="https", label="Code repository URL")
+    demo_url = forms.URLField(max_length=500, required=False, assume_scheme="https", label="Demo URL")
 
     class Meta:
         model = Project
@@ -196,7 +211,14 @@ def project_form(request, slug, pk=None):
     if request.method == "POST":
         if submissions_closed_reason(event):
             return closed(request, event)
+        same = project.pk is None and form.is_valid() and member.team.projects.filter(
+            title__iexact=form.cleaned_data["title"]).first()
+        if same:
+            # A double-clicked "Save" posts twice: the second one lands here.
+            messages.error(request, f"Your team already has a project called {same.title}. Edit that one instead.")
+            return redirect("project-edit", slug=slug, pk=same.pk)
         if form.is_valid():
+            was_submitted = project.status == Project.Status.SUBMITTED
             before = None if project.pk is None else audit.snapshot(Project.objects.get(pk=project.pk), PROJECT_FIELDS)
             submit = "submit" in request.POST
             try:
@@ -217,8 +239,38 @@ def project_form(request, slug, pk=None):
                          after=audit.snapshot(project, PROJECT_FIELDS))
             if submit:
                 flag_on_submit(request, event, project)
-            messages.success(request, "Submitted." if submit else "Saved as a draft.")
+            messages.success(request, "Submitted." if submit else
+                             "Saved. It stays submitted and public." if was_submitted else "Saved as a draft.")
             return redirect("event-me", slug=slug)
     return render(request, "portal/participant/project_form.html", {
         "event": event, "form": form, "project": project, "closed": submissions_closed_reason(event),
     })
+
+
+@login_required
+@require_POST
+def delete_project(request, slug, pk):
+    """A team may throw away its own draft before the deadline. A submitted
+    project stays: judges and voters may already have seen it."""
+    event = get_object_or_404(Event, slug=slug)
+    member = TeamMember.objects.filter(event=event, user=request.user).select_related("team").first()
+    if member is None:
+        raise Http404
+    project = get_object_or_404(member.team.projects, pk=pk)
+    if submissions_closed_reason(event):
+        return closed(request, event)
+    if project.status != Project.Status.DRAFT:
+        messages.error(request, "A submitted project can't be deleted. Ask the organizers if it needs to go.")
+        return redirect("event-me", slug=slug)
+    title = project.title
+    try:
+        with guarded():   # the audit row goes if the deadline trigger refuses the delete
+            audit.record("project.delete", request=request, event=event, obj=project,
+                         before=audit.snapshot(project, PROJECT_FIELDS))
+            project.delete()
+    except APIException as exc:
+        if exc.status_code == 409:
+            return closed(request, event)
+        raise
+    messages.success(request, f"Deleted the draft {title}.")
+    return redirect("event-me", slug=slug)

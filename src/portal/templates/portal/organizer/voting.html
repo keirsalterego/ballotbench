@@ -6,7 +6,7 @@
 <dl class="facts">
   <dt>Who votes</dt><dd>{% if event.voting_mode == "off" %}Nobody: voting is off. Turn it on in <a href="{% url 'manage' event.slug %}">Settings</a>.{% else %}{{ event.get_voting_mode_display|capfirst }}, {{ event.vote_credits }} credits each{% endif %}</dd>
   <dt>Window</dt><dd>{% if event.voting_open and event.voting_close %}{{ event.voting_open|date:"j M Y H:i" }} to {{ event.voting_close|date:"j M Y H:i" }} UTC{% else %}not set{% endif %}{% if closed and event.voting_mode != "off" %}. {{ closed }}{% elif not closed %}. Open now.{% endif %}</dd>
-  <dt>Ballots counted</dt><dd>{{ counted }}{% if voided %}, and {{ voided }} voided{% endif %}</dd>
+  <dt>Ballots counted</dt><dd>{{ counted }}{% if voided %}, and {{ voided }} voided{% endif %}{% if opened %}. {{ opened }} {{ opened|pluralize:"person,people" }} opened the ballot without casting one{% endif %}</dd>
   {% if event.voting_mode != "off" %}<dt>Ballot page</dt><dd><a href="{% url 'ballot' event.slug %}">{{ request.scheme }}://{{ request.get_host }}{% url 'ballot' event.slug %}</a></dd>{% endif %}
 </dl>
 

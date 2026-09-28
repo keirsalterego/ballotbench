@@ -1,17 +1,39 @@
 {% extends "portal/base.html" %}
-{% block title %}{% if project.pk %}Edit {{ project.title }}{% else %}New project{% endif %}{% endblock %}
+{% block title %}{% if project.pk %}{% if not closed %}Edit {% endif %}{{ project.title }}{% else %}New project{% endif %}{% endblock %}
 {% block content %}
+{% if closed %}
+<h1>{% if project.pk %}{{ project.title }}{% else %}New project{% endif %}</h1>
+<p class="badge bad">{{ closed }}</p>
+{% if project.pk %}
+<dl class="facts">
+  <dt>Status</dt><dd>{{ project.status }}</dd>
+  {% if project.tagline %}<dt>Tagline</dt><dd>{{ project.tagline }}</dd>{% endif %}
+  {% if project.track %}<dt>Track</dt><dd>{{ project.track.name }}</dd>{% endif %}
+  <dt>Summary</dt><dd>{{ project.summary }}</dd>
+  {% if project.description %}<dt>Description</dt><dd>{{ project.description|linebreaks }}</dd>{% endif %}
+  {% if project.repo_url %}<dt>Code repository URL</dt><dd>{{ project.repo_url }}</dd>{% endif %}
+  {% if project.demo_url %}<dt>Demo URL</dt><dd>{{ project.demo_url }}</dd>{% endif %}
+  {% if project.tags %}<dt>Tags</dt><dd>{{ project.tags|join:", " }}</dd>{% endif %}
+</dl>
+{% endif %}
+<p><a href="{% url 'event-me' event.slug %}">Back to your team</a></p>
+{% else %}
 <h1>{% if project.pk %}Edit {{ project.title }}{% else %}New project{% endif %}</h1>
 <p class="muted">{{ event.name }}: editable until {{ event.submissions_close|date:"j M Y H:i" }} UTC.</p>
-{% if closed %}<p class="badge bad">{{ closed }}</p>{% endif %}
 <form method="post" class="stack">
   {% csrf_token %}
   {{ form.non_field_errors }}
   {% for field in form %}<label>{{ field.label }} {{ field }} {% if field.help_text %}<span class="muted">{{ field.help_text }}</span>{% endif %} {{ field.errors }}</label>{% endfor %}
   <div class="filters">
-    <button name="save">Save draft</button>
-    {% if project.status != "submitted" %}<button name="submit">Submit</button>{% endif %}
+    {% if project.status == "submitted" %}<button name="save">Save changes</button>
+    {% else %}<button name="save">Save draft</button> <button name="submit">Submit</button>{% endif %}
   </div>
   <p class="muted">A draft is visible to your team and the organizers only. Once submitted, it's in the public gallery; you can keep editing until the deadline.</p>
 </form>
+{% if project.pk and project.status == "draft" %}
+<form method="post" action="{% url 'project-delete' event.slug project.pk %}">{% csrf_token %}
+  <button class="danger">Delete this draft</button>
+</form>
+{% endif %}
+{% endif %}
 {% endblock %}

@@ -1,0 +1,206 @@
+"""Regression tests for what a stranger's walkthrough found on the
+participant side: each one is the step as it was reported."""
+import io
+import json
+from datetime import timedelta
+
+import pytest
+from django.contrib.messages import get_messages
+from django.core.management import call_command
+
+from portal.access import db_now
+from portal.models import AuditLog, Comment, Event, Membership, Project, Team, TeamInvite, TeamMember, User
+from portal.participant import _hash
+
+from .conftest import EMAILS, EVENT
+from .test_voting import DEMO, ballot  # noqa: F401 (a fixture)
+
+pytestmark = pytest.mark.django_db
+
+
+def flashed(response):
+    return [str(m) for m in get_messages(response.wsgi_request)]
+
+
+@pytest.fixture
+def me(web):
+    """A participant of an event that takes submissions now, on a team."""
+    now = db_now()
+    event = Event.objects.create(slug="qa-open", name="QA open", submissions_open=now - timedelta(hours=1),
+                                 submissions_close=now + timedelta(days=1))
+    user = User.objects.create_user("qa-person@example.org", "pw-for-tests-only", name="QA person")
+    Membership.objects.create(user=user, event=event, role=Membership.Role.PARTICIPANT)
+    client = web()
+    client.force_login(user)
+    return client, event, user
+
+
+def on_team(event, user, name="QA team"):
+    team = Team.objects.create(event=event, name=name)
+    TeamMember.objects.create(team=team, event=event, user=user)
+    return team
+
+
+def test_an_over_long_team_name_says_so(me):
+    client, event, _ = me
+    response = client.post(f"/events/{event.slug}/team", {"name": "x" * 300})
+    assert flashed(response) == ["A team name can be at most 200 characters (this one has 300)."]
+    assert not event.teams.exists()
+
+
+def test_a_team_name_already_taken_in_the_event_is_refused(me):
+    client, event, _ = me
+    Team.objects.create(event=event, name="Night Owls")
+    response = client.post(f"/events/{event.slug}/team", {"name": "night owls"})
+    assert "already a team called night owls" in flashed(response)[0]
+    assert event.teams.count() == 1
+
+
+def test_a_submitted_project_saves_changes_not_a_draft(me):
+    client, event, user = me
+    team = on_team(event, user)
+    project = Project.objects.create(event=event, team=team, title="Lamp", summary="s", status="submitted",
+                                     submitted_at=db_now())
+    url = f"/events/{event.slug}/project/{project.pk}/edit"
+    page = client.get(url).content.decode()
+    assert "Save changes" in page and "Save draft" not in page
+    response = client.post(url, {"title": "Lamp 2", "summary": "s", "save": ""})
+    assert flashed(response) == ["Saved. It stays submitted and public."]
+    assert Project.objects.get(pk=project.pk).status == "submitted"
+
+
+def test_a_team_deletes_its_own_draft_but_not_a_submitted_project(me):
+    client, event, user = me
+    team = on_team(event, user)
+    draft = Project.objects.create(event=event, team=team, title="Draft", summary="s")
+    kept = Project.objects.create(event=event, team=team, title="Kept", summary="s", status="submitted",
+                                  submitted_at=db_now())
+    assert "Delete this draft" in client.get(f"/events/{event.slug}/project/{draft.pk}/edit").content.decode()
+    assert client.post(f"/events/{event.slug}/project/{draft.pk}/delete").status_code == 302
+    assert not Project.objects.filter(pk=draft.pk).exists()
+    assert AuditLog.objects.filter(action="project.delete", object_id=str(draft.pk)).exists()
+    client.post(f"/events/{event.slug}/project/{kept.pk}/delete")
+    assert Project.objects.filter(pk=kept.pk).exists()
+
+
+def test_deleting_a_draft_after_the_deadline_is_409(me):
+    client, event, user = me
+    draft = Project.objects.create(event=event, team=on_team(event, user), title="Draft", summary="s")
+    now = db_now()
+    Event.objects.filter(pk=event.pk).update(submissions_open=now - timedelta(days=2),
+                                             submissions_close=now - timedelta(minutes=1))
+    assert client.post(f"/events/{event.slug}/project/{draft.pk}/delete").status_code == 409
+    assert Project.objects.filter(pk=draft.pk).exists()
+
+
+def test_someone_elses_draft_cant_be_deleted(me):
+    client, event, user = me
+    other = Team.objects.create(event=event, name="Other")
+    on_team(event, user)
+    draft = Project.objects.create(event=event, team=other, title="Theirs", summary="s")
+    assert client.post(f"/events/{event.slug}/project/{draft.pk}/delete").status_code == 404
+    assert Project.objects.filter(pk=draft.pk).exists()
+
+
+def test_a_double_posted_new_project_makes_one(me):
+    client, event, user = me
+    team = on_team(event, user)
+    form = {"title": "Twice", "summary": "s", "save": ""}
+    client.post(f"/events/{event.slug}/project/new", form)
+    response = client.post(f"/events/{event.slug}/project/new", form)
+    only = team.projects.get()
+    assert response.url == f"/events/{event.slug}/project/{only.pk}/edit"
+    assert any("already has a project called Twice" in m for m in flashed(response))
+
+
+def test_the_page_disables_buttons_once_a_form_is_sent(web):
+    page = web().get("/projects").content.decode()
+    assert "e.submitter" in page and "b.disabled = true" in page
+
+
+def test_the_same_comment_twice_within_a_minute_is_refused(api):
+    project = Project.objects.filter(event__slug=EVENT, status="submitted").order_by("pk").first()
+    url, body = f"/api/projects/{project.pk}/comments", {"body": "Nice."}
+    assert api("participant").post(url, body, content_type="application/json").status_code == 201
+    second = api("participant").post(url, body, content_type="application/json")
+    assert second.status_code == 409 and "just posted" in second.json()["detail"]
+    Comment.objects.filter(project=project).update(created_at=db_now() - timedelta(seconds=61))
+    assert api("participant").post(url, body, content_type="application/json").status_code == 201
+
+
+def test_after_the_deadline_the_project_page_is_read_only(web):
+    own = Project.objects.filter(event__slug=EVENT, team__members__user__email=EMAILS["participant"]).first()
+    response = web("participant").get(f"/events/{EVENT}/project/{own.pk}/edit")
+    page = response.content.decode()
+    assert response.status_code == 200 and "closed" in page and own.title in page
+    assert "<button" not in page.split("<main>")[1].split("</main>")[0]
+
+
+def test_take_part_lists_only_events_still_taking_submissions(web):
+    now = db_now()
+    Event.objects.create(slug="qa-soon", name="QA soon", submissions_open=now + timedelta(days=1),
+                         submissions_close=now + timedelta(days=2))
+    Event.objects.create(slug="qa-over", name="QA over", submissions_open=now - timedelta(days=2),
+                         submissions_close=now - timedelta(days=1))
+    client = web()
+    client.force_login(User.objects.create_user("qa-new@example.org", "pw-for-tests-only"))
+    page = client.get("/me").content.decode()
+    assert "QA soon" in page and "opens" in page
+    assert "QA over" not in page and "Sample Hack" not in page
+
+
+def test_an_imported_event_gets_a_name_of_its_own(api, web, tmp_path):
+    bundle = api("organizer").get(f"/api/events/{EVENT}/export/bundle.json").json()
+    original = Event.objects.get(slug=EVENT).name
+    assert web("admin").post("/api/events/import?slug=qa-copy", json.dumps(bundle),
+                             content_type="application/json").status_code == 201
+    assert Event.objects.get(slug="qa-copy").name == f"{original} (imported)"
+    assert web("admin").post("/api/events/import?slug=qa-named&name=Spring+rerun", json.dumps(bundle),
+                             content_type="application/json").status_code == 201
+    assert Event.objects.get(slug="qa-named").name == "Spring rerun"
+    path = tmp_path / "bundle.json"
+    path.write_text(json.dumps(bundle))
+    call_command("import_event", str(path), slug="qa-cli", name="From the shell", stdout=io.StringIO())
+    assert Event.objects.get(slug="qa-cli").name == "From the shell"
+
+
+def test_a_refused_ballot_leaves_nobody_in_the_voter_list(web, ballot):  # noqa: F811
+    event, projects = ballot
+    response = web("participant").post(f"/events/{DEMO}/vote", {f"p{projects[0].pk}": "1"})
+    assert response.status_code == 409
+    page = web("organizer").get(f"/events/{DEMO}/manage/voting")
+    assert page.context["counted"] == 0 and page.context["voters"] == []
+    assert "1 person opened the ballot without casting one" in page.content.decode()
+
+
+def test_signing_up_from_an_invite_doesnt_say_join_an_event(web):
+    response = web().post("/signup?next=/invite/abc", {"name": "New", "email": "qa-signup@example.org",
+                                                       "password": "a long enough passphrase"})
+    assert response.url == "/invite/abc"
+    assert not any("Join an event" in m for m in flashed(response))
+
+
+def test_a_full_team_offers_no_invite_and_its_links_no_join_button(me, web):
+    client, event, user = me
+    Event.objects.filter(pk=event.pk).update(max_team_size=1)
+    team = on_team(event, user)
+    page = client.get(f"/events/{event.slug}/me").content.decode()
+    assert "Your team is full" in page and "Make an invite link" not in page
+    TeamInvite.objects.create(team=team, token_hash=_hash("qa-token"), created_by=user,
+                              expires_at=db_now() + timedelta(hours=1))
+    stranger = web()
+    stranger.force_login(User.objects.create_user("qa-stranger@example.org", "pw-for-tests-only"))
+    page = stranger.get("/invite/qa-token").content.decode()
+    assert "This team is full." in page and "Join the team" not in page
+
+
+def test_login_keeps_the_email_after_a_wrong_password(web):
+    page = web().post("/login", {"username": "qa-typo@example.org", "password": "nope"}).content.decode()
+    assert 'value="qa-typo@example.org"' in page
+
+
+def test_project_form_names_its_urls_plainly(me):
+    client, event, user = me
+    on_team(event, user)
+    page = client.get(f"/events/{event.slug}/project/new").content.decode()
+    assert "Code repository URL" in page and "Demo URL" in page and "Repo url" not in page

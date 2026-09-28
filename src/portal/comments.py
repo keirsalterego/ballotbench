@@ -3,11 +3,14 @@ organizers may hide a comment, which then disappears for everyone but them.
 Hidden comments are kept, not deleted, so hiding can be undone and the audit
 row about it still points at something. Bodies are plain text, escaped
 wherever they are shown."""
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from drf_spectacular.utils import extend_schema
 from rest_framework import exceptions, permissions, serializers
@@ -19,6 +22,7 @@ from .access import Conflict, db_now, is_organizer, visible_projects
 from .models import Comment, Project
 
 COMMENT_LIMIT = (10, 600)      # per account per 10 minutes
+REPEAT_WINDOW = timedelta(seconds=60)   # the same words twice this fast is a double click
 
 
 def visible_comments(user, project):
@@ -47,12 +51,15 @@ class CommentSerializer(serializers.ModelSerializer):
 
 def add_comment(request, project, data):
     """Validate and save a comment by request.user. Raises an APIException
-    (409 on a draft, 400 for a bad body, 429 when rate limited)."""
+    (409 on a draft or a repeat, 400 for a bad body, 429 when rate limited)."""
     ratelimit.check((f"comment:{request.user.pk}", *COMMENT_LIMIT))
     if project.status != Project.Status.SUBMITTED:
         raise Conflict("comments open once the project is submitted")
     body = CommentSerializer(data=data)
     body.is_valid(raise_exception=True)
+    if project.comments.filter(author=request.user, body=body.validated_data["body"],
+                               created_at__gte=timezone.now() - REPEAT_WINDOW).exists():
+        raise Conflict("you just posted that comment")
     comment = Comment.objects.create(project=project, author=request.user, body=body.validated_data["body"])
     audit.record("comment.create", request=request, event=project.event, obj=comment,
                  after={"project": project.pk, "length": len(comment.body)})
@@ -98,7 +105,8 @@ def moderate(request, pk):
                description="A project's comments, oldest first. Hidden ones are left out, except for the "
                            "event's organizers.")
 @extend_schema(methods=["POST"], request=CommentSerializer, responses={201: CommentSerializer},
-               description="Comment on a submitted project. 401 without credentials, 409 on a draft, "
+               description="Comment on a submitted project. 401 without credentials, 409 on a draft or on the same "
+                           "comment by the same person within a minute, "
                            "400 for an empty or over-long body, 429 when rate limited.")
 @api_view(["GET", "POST"])
 @permission_classes([permissions.AllowAny])

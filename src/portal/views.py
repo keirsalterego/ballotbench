@@ -167,12 +167,13 @@ def signup(request):
         audit.record("user.signup", request=request, actor=user, obj=user, after={"email": user.email})
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         send_confirmation(request, user)
-        messages.success(request, "Welcome. Join an event below, or open an invite link from your team.")
         target = request.GET.get("next", "")
         # Only follow `next` to a page on this site, never to another host.
         if not url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()},
                                                require_https=request.is_secure()):
             target = "home"
+        messages.success(request, "Welcome. Join an event below, or open an invite link from your team."
+                         if target == "home" else "Welcome. Your account is ready.")
         return redirect(target)
     return render(request, "registration/signup.html", {"form": form})
 
@@ -182,8 +183,11 @@ def home(request):
     memberships = (Membership.objects.filter(user=request.user).select_related("event")
                    .order_by("-event__submissions_close", "role"))
     teams = {m.event_id: m.team for m in TeamMember.objects.filter(user=request.user).select_related("team")}
-    joinable = Event.objects.exclude(memberships__user=request.user).order_by("-submissions_close")
+    now = db_now()
+    # Only events still taking (or yet to take) submissions: joining a closed one leads nowhere.
+    joinable = (Event.objects.exclude(memberships__user=request.user).filter(submissions_close__gt=now)
+                .order_by("submissions_close"))
     return render(request, "portal/home.html", {
-        "memberships": memberships, "teams": teams, "joinable": joinable,
+        "memberships": memberships, "teams": teams, "joinable": joinable, "now": now,
         "can_create": request.user.is_staff or memberships.filter(role=Membership.Role.ORGANIZER).exists(),
     })

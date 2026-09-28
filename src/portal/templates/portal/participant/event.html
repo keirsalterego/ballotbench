@@ -23,7 +23,9 @@
     <pre>{{ new_link }}</pre>
     <p class="muted">Single use. It expires in 72 hours or when submissions close, whichever is first.</p>
   {% endif %}
-  {% if not closed %}
+  {% if full %}
+  <p class="muted">Your team is full.</p>
+  {% elif not closed %}
   <form method="post" action="{% url 'invite-create' team.pk %}">{% csrf_token %}<button>Make an invite link</button></form>
   {% endif %}
   {% if invites %}

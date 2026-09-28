@@ -2,15 +2,17 @@
 {% block title %}Results: {{ event.name }}{% endblock %}
 {% block content %}
 <h1>{{ event.name }} results</h1>
-{% if preview %}<p class="flag">Preview. Only organizers can see this until the results are published.</p>
+{% if preview %}<p class="flag">Preview. Only organizers can see this {% if event.published_run_id %}while community voting is open{% else %}until the results are published{% endif %}.</p>
 {% else %}<p>Published {{ event.results_published_at|date:"j F Y, H:i" }} UTC.</p>{% endif %}
 <p>Each project's score is the judges' rubric scores with every judge's habits taken out: how lenient they were, and how widely they spread their marks. Next to each rank is the range it could plausibly have landed in; where ranges overlap, the judges couldn't really tell the projects apart.</p>
+{% if community %}<p>The community vote is shown under each project. It is separate from the judges' score and doesn't change the ranking.</p>{% endif %}
 <ol class="docket" style="display:block">
 {% for r in rows %}
   <li>
     <h2>{{ r.rank }}. <a href="{% url 'project' r.project_id %}">{{ r.project.title }}</a></h2>
     <p class="by">by {{ r.project.team.name }}{% if r.project.track %}, in {{ r.project.track.name }}{% endif %}</p>
     <p class="num">Score {{ r.display|floatformat:3 }} from {{ r.n_reviews }} review{{ r.n_reviews|pluralize }}{% if r.rank_low %}; could rank anywhere from {{ r.rank_low }} to {{ r.rank_high }}{% endif %}</p>
+    {% if community %}<p class="num">Community votes: {{ r.community.0 }} from {{ r.community.1 }} voter{{ r.community.1|pluralize }}</p>{% endif %}
   </li>
 {% endfor %}
 </ol>

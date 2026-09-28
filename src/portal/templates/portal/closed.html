@@ -1,7 +1,7 @@
 {% extends "portal/base.html" %}
 {% block title %}Closed{% endblock %}
 {% block content %}
-<h1>That window is closed</h1>
+<h1>{{ heading|default:"That window is closed" }}</h1>
 <p>{{ reason|default:"This action isn't open right now." }}</p>
 <p class="muted">Deadlines are checked on the server's clock. Nothing was changed.</p>
 <p><a href="{% url 'home' %}">Back to my events</a></p>

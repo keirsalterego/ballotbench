@@ -73,7 +73,8 @@ class SignupForm(forms.Form):
         return email
 
 
-LOGIN_LIMIT = (20, 600)       # attempts per address per 10 minutes
+LOGIN_LIMIT = (20, 600)       # attempts per address per 10 minutes (scaled for venues, see ratelimit.py)
+LOGIN_ACCOUNT_LIMIT = (10, 600)     # attempts at one account per 10 minutes, whatever the address
 SIGNUP_LIMIT = (10, 3600)     # new accounts per address per hour
 
 
@@ -81,6 +82,11 @@ def login_page(request):
     """Django's login page, with a cap on attempts per address so a password
     can't be guessed at network speed."""
     if request.method == "POST" and not ratelimit.allow(ratelimit.ip_key(request, "login"), *LOGIN_LIMIT):
+        return ratelimit.refused(request)
+    # Per account too: the address limit is sized for a whole venue, so on
+    # its own it would allow a lot of guesses at one person's password.
+    account = request.POST.get("username", "").strip().lower()[:254]
+    if request.method == "POST" and account and not ratelimit.allow(f"login-account:{account}", *LOGIN_ACCOUNT_LIMIT):
         return ratelimit.refused(request)
     return auth_views.LoginView.as_view()(request)
 

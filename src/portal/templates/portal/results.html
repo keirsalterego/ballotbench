@@ -17,5 +17,6 @@
   </li>
 {% endfor %}
 </ol>
-<p class="faint">Scores fingerprint <code>{{ run.input_digest }}</code>: anyone with the scores can check this result was computed from them.</p>
+<p class="faint">Scores fingerprint <code>{{ run.input_digest }}</code>: anyone with the scores can check this result was computed from them.
+  {% if not preview %}A <a href="{% url 'api-results-signed' event.slug %}">signed copy of these results</a> can be checked at <a href="/verify">/verify</a>, or offline with the portal's public key, long after this page changes.{% endif %}</p>
 {% endblock %}

@@ -69,6 +69,7 @@ urlpatterns = [
     path("api/events/<slug:slug>/projects", api.event_projects, name="api-event-projects"),
     path("api/events/<slug:slug>/export/<slug:kind>.csv", exports.export_csv, name="api-export"),
     path("api/events/<slug:slug>/results", results.api_results, name="api-results"),
+    path("api/events/<slug:slug>/results/signed", results.api_signed_results, name="api-results-signed"),
     path("api/events/<slug:slug>/ballot", voting.api_ballot, name="api-ballot"),
     path("api/projects/<int:pk>", api.project_detail, name="api-project"),
     path("api/projects/<int:pk>/comments", comments.api_comments, name="api-comments"),

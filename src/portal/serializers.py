@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Event, Project, Review, RubricCriterion, Track
+from .scoring import weighted_score
 
 
 class TrackSerializer(serializers.ModelSerializer):
@@ -63,5 +64,4 @@ class ReviewScoresSerializer(serializers.Serializer):
         return {s.criterion.key: s.value for s in review.scores.all()}
 
     def get_weighted_total(self, review: Review) -> float | None:
-        from .scoring import weighted_score
         return weighted_score(review)

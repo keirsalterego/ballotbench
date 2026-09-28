@@ -81,10 +81,23 @@ def test_normalize_email(typed, inbox):
     assert voting.normalize_email(typed) == inbox
 
 
-@pytest.mark.parametrize("typed", ["+tag@example.org", "nobody", "@example.org", "user@"])
-def test_normalize_email_refuses_non_addresses(typed):
-    with pytest.raises(ValueError):
-        voting.normalize_email(typed)
+@pytest.mark.parametrize("typed", ["+tag@example.org", "+x@Example.com", "nobody", "@example.org", "user@"])
+def test_normalize_email_keeps_what_it_cant_take_apart(typed):
+    assert voting.normalize_email(typed) == typed.lower()
+
+
+def test_one_odd_team_address_doesnt_break_email_ballots(web, ballot, mailoutbox):
+    """normalize_email runs over every team member's address for an email
+    voter's ballot; +x@example.com used to raise, a 500 for every voter."""
+    event, projects = ballot
+    Event.objects.filter(pk=event.pk).update(voting_mode="email")
+    odd = User.objects.create_user("+x@example.com", "pw-for-tests-only")
+    TeamMember.objects.create(team=Team.objects.create(event=event, name="Plus"), event=event, user=odd)
+    client = web()
+    client.post(f"/events/{DEMO}/vote/link", {"email": "honest@example.org"})
+    assert client.post(link_in(mailoutbox[0])).status_code == 302
+    assert client.get(f"/events/{DEMO}/vote").status_code == 200
+    assert web().post(f"/events/{DEMO}/vote/link", {"email": "+y@example.org"}).status_code == 200
 
 
 # The ballot

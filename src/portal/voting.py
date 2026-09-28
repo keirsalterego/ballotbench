@@ -54,13 +54,16 @@ def normalize_email(address):
     """One spelling per inbox, so that one inbox gets one ballot. Lowercase,
     and drop a +tag, which nearly every provider delivers to the plain
     address; Gmail also ignores dots and answers to googlemail.com too.
-    Raises ValueError for something that isn't an address."""
-    local, _, domain = address.strip().lower().rpartition("@")
+    It never raises: it also runs over team members' account emails, and one
+    odd address mustn't break every ballot. Something it can't take apart,
+    like +x@example.com, stays as it is, lowercased."""
+    lowered = address.strip().lower()
+    local, _, domain = lowered.rpartition("@")
     local = local.split("+", 1)[0]
     if domain in GMAIL:
         local, domain = local.replace(".", ""), "gmail.com"
     if not local or not domain:
-        raise ValueError(f"not an email address: {address!r}")
+        return lowered
     return f"{local}@{domain}"
 
 

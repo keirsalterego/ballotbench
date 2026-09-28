@@ -69,3 +69,27 @@ def test_proof_handles_an_event_with_no_reviews(db):
     out = io.StringIO()
     call_command("normalization_proof", "--event", "demo-open", stdout=out)
     assert "nothing to calibrate" in out.getvalue()
+
+
+def test_issue_use_and_revoke_your_own_token(web):
+    import re
+    from django.test import Client
+    client = web("judge_a")
+    client.post("/me/tokens", {"label": "script"})
+    token = re.search(r"<pre>(bb_[\w-]+)</pre>", client.get("/me/tokens").content.decode()).group(1)
+    api = Client(HTTP_AUTHORIZATION=f"Bearer {token}")
+    assert api.get("/api/judge/scores").status_code == 200
+    from portal.models import ApiToken
+    row = ApiToken.objects.get(label="script")
+    assert row.token_hash != token
+    assert web("judge_b").post(f"/me/tokens/{row.pk}/revoke").status_code == 404     # not yours
+    client.post(f"/me/tokens/{row.pk}/revoke")
+    assert api.get("/api/judge/scores").status_code == 401
+    assert AuditLog.objects.filter(action__in=["token.issue", "token.revoke"]).count() >= 2
+
+
+def test_new_token_is_shown_once(web):
+    client = web("participant")
+    client.post("/me/tokens", {"label": "once"})
+    assert "<pre>bb_" in client.get("/me/tokens").content.decode()
+    assert "<pre>bb_" not in client.get("/me/tokens").content.decode()

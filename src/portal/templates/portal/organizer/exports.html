@@ -1,0 +1,13 @@
+{% extends "portal/base.html" %}
+{% block title %}Exports{% endblock %}
+{% block content %}
+<h1>Exports</h1>
+{% include "portal/organizer/_nav.html" %}
+<p>Everything in this event as CSV, for a spreadsheet or another tool. Each download is recorded in the audit log.
+  Cells that a spreadsheet would run as a formula start with a quote.</p>
+<div class="table-wrap"><table>
+  <tbody>{% for kind, what in kinds %}{% if kind in known %}
+  <tr><td><a href="{% url 'api-export' event.slug kind %}">{{ kind }}.csv</a></td><td>{{ what }}</td></tr>
+  {% endif %}{% endfor %}</tbody>
+</table></div>
+{% endblock %}

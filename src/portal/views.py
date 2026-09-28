@@ -2,12 +2,13 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from . import audit
+from . import audit, ratelimit
 from .access import visible_projects
 from .models import Event, Membership, Project, TeamMember, Track, User
 
@@ -57,8 +58,22 @@ class SignupForm(forms.Form):
         return email
 
 
+LOGIN_LIMIT = (20, 600)       # attempts per address per 10 minutes
+SIGNUP_LIMIT = (10, 3600)     # new accounts per address per hour
+
+
+def login_page(request):
+    """Django's login page, with a cap on attempts per address so a password
+    can't be guessed at network speed."""
+    if request.method == "POST" and not ratelimit.allow(ratelimit.ip_key(request, "login"), *LOGIN_LIMIT):
+        return ratelimit.refused(request)
+    return auth_views.LoginView.as_view()(request)
+
+
 def signup(request):
     form = SignupForm(request.POST or None)
+    if request.method == "POST" and not ratelimit.allow(ratelimit.ip_key(request, "signup"), *SIGNUP_LIMIT):
+        return ratelimit.refused(request)
     if request.method == "POST" and form.is_valid():
         user = User.objects.create_user(form.cleaned_data["email"], form.cleaned_data["password"],
                                         name=form.cleaned_data["name"])

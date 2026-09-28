@@ -3,15 +3,17 @@
 ballotbench is one Django application in front of one Postgres database,
 started by one `docker compose up`. Pages are rendered on the server; the
 JSON API sits next to them and answers the same questions with the same
-rules. There is no JavaScript framework, no queue, no cache and no outside
+rules. There is no JavaScript framework, no queue beyond a webhook outbox
+table, no cache and no outside
 service, because a hackathon portal has hundreds of users, not millions, and
 every moving part is something a volunteer organizer has to keep running.
 
 ```
-browser ──► gunicorn :8080 ──► Django ──► Postgres 18
-curl    ─┘   (web container)    │         (db container)
-                                ├─ pages   portal/views, participant, judge, organizer, progress, results, oversight
-                                ├─ API     portal/api, judge (api_*), results (api_results), exports
+browser ──► gunicorn :8080 ──► Django ──► Postgres 18 ◄── deliver_webhooks ──► your receivers
+curl    ─┘   (web container)    │         (db container)   (webhooks container, same image)
+                                ├─ pages   portal/views, participant, judge, organizer, progress, results,
+                                │          oversight, voting, comments, explain, records, embed, webhooks
+                                ├─ API     portal/api, judge, results, voting, comments, records, bundles, exports
                                 └─ rules   portal/access  +  triggers in the database
 ```
 
@@ -20,7 +22,7 @@ curl    ─┘   (web container)    │         (db container)
 | Module | What it does |
 |-|-|
 | `models.py` | the schema, with its unique and check constraints |
-| `migrations/0002-0005` | the triggers: deadline, team rules, judging rules, audit chain |
+| `migrations/0002-0005`, `0012` | the triggers (12 in all): deadline, team rules, judging rules, the audit chain, and the voting rules in 0012 |
 | `access.py` | roles, the scoped querysets every view starts from, the status-code rules, the deadline check on the database clock |
 | `auth.py` | bearer tokens (hashed), for the API and, via a middleware, the pages |
 | `audit.py` | writes one audit row per change, in the change's transaction |
@@ -35,6 +37,10 @@ curl    ─┘   (web container)    │         (db container)
 | `oversight.py` | audit log page, duplicate resolution, the exports page |
 | `exports.py` | CSV exports |
 | `duplicates.py` | duplicate submission detection |
+| `voting.py`, `ratelimit.py`, `mail.py` | the community vote, rate limits counted in Postgres, the offline mail outbox |
+| `comments.py` | project comments and their moderation |
+| `pairwise.py`, `explain.py` | the Bradley-Terry second opinion; a team's own "how we were scored" page |
+| `records.py`, `signing.py`, `embed.py`, `bundles.py`, `webhooks.py`, `tokens.py` | T4: signed records and certificates, the embeddable gallery, event bundles, webhooks, personal API tokens |
 
 The two pieces with real logic, the planner and the calibration, take plain
 tuples and return plain objects. They know nothing about Django, so they're
@@ -128,9 +134,9 @@ The same everywhere, pages and API:
   scripts and the checker use bearer tokens (no cookies, so no CSRF risk).
   Pages accept tokens too so that the isolation probe tests what a browser
   gets.
-- **Single process.** gunicorn with three workers, no background worker.
-  Nothing in the portal is slow enough to need one; calibration runs inside
-  the organizer's request.
+- **Two processes.** gunicorn with three workers, and the `webhooks` sender
+  (same image). Nothing else runs in the background: calibration takes a
+  few seconds and runs inside the organizer's request.
 
 ## Beyond T2 (tier T4)
 

@@ -255,3 +255,29 @@ def bootstrap(obs, rankable=None, resamples=200, seed=1):
         low, high = rs[int(0.05 * (len(rs) - 1))], rs[int(math.ceil(0.95 * (len(rs) - 1)))]
         result[p] = (low, high, math.sqrt(_var(qs[p])))
     return result
+
+
+def kingmakers(obs, rankable=None, podium=3):
+    """Would the podium change if one judge's reviews were left out?
+
+    Refit without each judge in turn and compare the top `podium` with the
+    full fit's. Returns [(judge, entered, left)] for every judge whose absence
+    changes who is on the podium, most disruptive first. A judge the model
+    already gives no weight never appears: leaving them out changes nothing.
+    One entry doesn't mean the judge did anything wrong; it means the podium
+    rests on one person's reviews, which the organizer should know before
+    publishing."""
+    obs = list(obs)
+
+    def top(o):
+        f = fit(o)
+        ranked = [p for p in f.projects if rankable is None or p in rankable]
+        return set(sorted(ranked, key=lambda p: (-f.projects[p].quality, str(p)))[:podium])
+
+    full = top(obs)
+    out = []
+    for j in sorted({o[0] for o in obs}, key=str):
+        without = top([o for o in obs if o[0] != j])
+        if without != full:
+            out.append((j, sorted(without - full, key=str), sorted(full - without, key=str)))
+    return sorted(out, key=lambda row: (-len(row[1]), str(row[0])))

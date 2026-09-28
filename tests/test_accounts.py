@@ -180,3 +180,8 @@ def test_guessing_one_accounts_password_is_capped_whatever_the_address(web):
     codes = [client.post("/login", {"username": "priya1@example.org", "password": f"wrong-{i}"},
                          REMOTE_ADDR=f"203.0.113.{i}").status_code for i in range(12)]
     assert codes[:10] == [200] * 10 and codes[-1] == 429
+
+
+def test_judges_get_a_your_reviews_link_and_others_do_not(web):
+    assert "Your reviews</a>" in web("judge_a").get("/projects").content.decode()
+    assert "Your reviews</a>" not in web("participant").get("/projects").content.decode()

@@ -120,6 +120,8 @@ button.link { background: none; border: 0; padding: 0; color: var(--action); fon
 .filters label { display: inline-flex; gap: 6px; align-items: center; }
 
 form.stack, .stack { display: grid; gap: calc(var(--step) * 4); max-width: 40rem; }
+form.stack { margin-bottom: calc(var(--step) * 6); }
+.stack > button { justify-self: start; }
 .stack label, label.field { display: grid; gap: calc(var(--step) * 1.5); font-weight: 700; }
 .stack label input, .stack label select, .stack label textarea, label.field input, label.field textarea { font-weight: 400; }
 .stack label .muted, .stack label .errorlist { font-weight: 400; font-size: .92rem; }

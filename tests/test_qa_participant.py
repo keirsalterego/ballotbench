@@ -140,6 +140,11 @@ def test_a_full_team_offers_no_invite_and_its_links_no_join_button(me, web):
     assert "This team is full." in page and "Join the team" not in page
 
 
+def test_login_keeps_the_email_after_a_wrong_password(web):
+    page = web().post("/login", {"username": "qa-typo@example.org", "password": "nope"}).content.decode()
+    assert 'value="qa-typo@example.org"' in page
+
+
 def test_project_form_names_its_urls_plainly(me):
     client, event, user = me
     on_team(event, user)

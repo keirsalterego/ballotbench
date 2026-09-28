@@ -33,9 +33,10 @@ def judging_closed_reason(event):
 
 def save_review(request, assignment, values, comment, submit):
     """Write a judge's review of one of their own assignments. `values` maps
-    criterion key to an integer. Returns the review. Raises Conflict when
-    judging is closed or the assignment was recused, Invalid-style
-    ValueError for a bad score."""
+    criterion key to an integer; `comment` None leaves the comment as it is.
+    Returns the review. Raises Conflict when judging is closed, the
+    assignment was recused or a submitted review would go back to a draft,
+    Invalid-style ValueError for a bad score."""
     event = assignment.event
     if reason := judging_closed_reason(event):
         raise Conflict(reason)
@@ -45,6 +46,9 @@ def save_review(request, assignment, values, comment, submit):
         raise Conflict("results are published, so reviews are closed")
     if assignment.status == JudgeAssignment.Status.RECUSED:
         raise Conflict("you recused yourself from this project")
+    if not submit and Review.objects.filter(assignment=assignment, submitted_at__isnull=False).exists():
+        # A draft save would change scores the organizer already counts.
+        raise Conflict("this review is submitted: resubmit to change it")
     criteria = list(event.criteria.all())
     unknown = set(values) - {c.key for c in criteria}
     if unknown:
@@ -61,7 +65,8 @@ def save_review(request, assignment, values, comment, submit):
         for c in criteria:
             if c.key in values:
                 Score.objects.update_or_create(review=review, criterion=c, defaults={"value": values[c.key]})
-        review.comment = comment
+        if comment is not None:
+            review.comment = comment
         if submit:
             review.submitted_at = db_now()
             assignment.status = JudgeAssignment.Status.DONE
@@ -120,7 +125,8 @@ def assignment_page(request, pk):
     if request.method == "POST" and form.is_valid():
         submit = "submit" in request.POST
         try:
-            save_review(request, assignment, form.values(), form.cleaned_data["comment"], submit)
+            comment = form.cleaned_data["comment"] if "comment" in request.POST else None
+            save_review(request, assignment, form.values(), comment, submit)
             messages.success(request, "Review submitted." if submit else "Draft saved.")
             return redirect("judge-queue")
         except Conflict as exc:
@@ -144,10 +150,14 @@ def recuse(request, pk):
     assignment = get_object_or_404(judge_assignments(request.user), pk=pk)
     if assignment.status == JudgeAssignment.Status.DONE:
         raise PageDenied
+    reason = request.POST.get("reason", "").strip()[:500]
+    if not reason:
+        messages.error(request, "Say what the conflict is, so the organizer can check it.")
+        return redirect("judge-assignment", pk=assignment.pk)
     assignment.status = JudgeAssignment.Status.RECUSED
     assignment.save(update_fields=["status"])
     audit.record("assignment.recuse", request=request, event=assignment.event, obj=assignment,
-                 after={"reason": request.POST.get("reason", "")[:500], "project": assignment.project_id})
+                 after={"reason": reason, "project": assignment.project_id})
     messages.success(request, "You've stepped aside from that project. The organizer will reassign it.")
     return redirect("judge-queue")
 
@@ -176,8 +186,9 @@ class ReviewIn(serializers.Serializer):
 @extend_schema(request=ReviewIn, responses={200: inline_serializer("ReviewOut", {
     "assignment": serializers.IntegerField(), "submitted_at": serializers.DateTimeField(allow_null=True),
     "weighted_total": serializers.FloatField(allow_null=True)})},
-    description="Score one of your own assignments. 404 if it isn't yours, 409 outside the judging window, "
-                "422 for a score out of range.")
+    description="Score one of your own assignments. 404 if it isn't yours, 409 outside the judging window or "
+                "for a draft (submit false) of a review already submitted, 422 for a score out of range. "
+                "Leave out comment to keep the stored one.")
 @api_view(["POST"])
 def api_review(request, pk):
     assignment = get_object_or_404(judge_assignments(request.user).select_related("event"), pk=pk)
@@ -185,7 +196,7 @@ def api_review(request, pk):
     body.is_valid(raise_exception=True)
     try:
         review = save_review(request, assignment, body.validated_data["scores"],
-                             body.validated_data.get("comment", ""), body.validated_data.get("submit", False))
+                             body.validated_data.get("comment"), body.validated_data.get("submit", False))
     except ValueError as exc:
         return Response({"detail": str(exc)}, status=422)
     return Response({"assignment": assignment.pk, "submitted_at": review.submitted_at,

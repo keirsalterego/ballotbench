@@ -34,9 +34,11 @@ services:
       BALLOTBENCH_DEMO_SEED: "1"
     ports:
       - "8080:8080"
-    # Healthy once the gallery answers, which is after migrate and seed.
+    # Healthy once the gallery answers, which is after migrate and seed. The
+    # header tells a DJANGO_SECURE=1 deployment this probe already came in over
+    # HTTPS, so it isn't redirected; without DJANGO_SECURE it's ignored.
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/projects', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8080/projects', headers={'X-Forwarded-Proto': 'https'}), timeout=3)"]
       interval: 3s
       timeout: 5s
       retries: 40

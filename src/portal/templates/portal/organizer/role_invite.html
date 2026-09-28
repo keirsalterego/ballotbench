@@ -1,0 +1,17 @@
+{% extends "portal/base.html" %}
+{% block title %}Invitation{% endblock %}
+{% block content %}
+{% if invalid %}
+  <h1>This invitation doesn't work</h1>
+  <p>It may have been used, revoked, or expired. Ask the organizer for a new one.</p>
+{% else %}
+  <h1>Become a {{ invite.role }} of {{ invite.event.name }}</h1>
+  {% if error %}<p class="badge bad">{{ error }}</p>{% endif %}
+  {% if user.is_authenticated %}
+    <p>You're signed in as {{ user.email }}.</p>
+    <form method="post">{% csrf_token %}<button>Accept</button></form>
+  {% else %}
+    <p><a href="{% url 'login' %}?next={{ request.path|urlencode }}">Log in</a> or <a href="{% url 'signup' %}?next={{ request.path|urlencode }}">sign up</a> first.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

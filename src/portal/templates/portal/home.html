@@ -12,6 +12,7 @@
     <td>{{ m.event.submissions_close|date:"j M Y H:i" }} UTC</td>
     <td>
       {% if m.role == "participant" %}<a href="{% url 'event-me' m.event.slug %}">Team and project</a>{% endif %}
+      {% if m.role == "judge" %}<a href="{% url 'judge-queue' %}">Your reviews</a>{% endif %}
       {% if m.role == "organizer" %}<a href="{% url 'manage' m.event.slug %}">Manage</a>{% endif %}
     </td>
   </tr>

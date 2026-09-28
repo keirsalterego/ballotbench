@@ -1,7 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from . import api, exports, organizer, participant, views
+from . import api, exports, judge, organizer, participant, views
 
 urlpatterns = [
     path("", views.gallery),
@@ -34,10 +34,16 @@ urlpatterns = [
     path("events/<slug:slug>/manage/invites/<int:pk>/revoke", organizer.revoke_role_invite, name="role-invite-revoke"),
     path("join/<str:token>", organizer.accept_role_invite, name="role-join"),
 
+    path("judge", judge.queue, name="judge-queue"),
+    path("judge/assignments/<int:pk>", judge.assignment_page, name="judge-assignment"),
+    path("judge/assignments/<int:pk>/recuse", judge.recuse, name="judge-recuse"),
+
     path("api/events", api.events, name="api-events"),
     path("api/events/<slug:slug>", api.event_detail, name="api-event"),
     path("api/events/<slug:slug>/projects", api.event_projects, name="api-event-projects"),
     path("api/events/<slug:slug>/export/<slug:kind>.csv", exports.export_csv, name="api-export"),
     path("api/projects/<int:pk>", api.project_detail, name="api-project"),
     path("api/judge/scores", api.judge_scores, name="api-judge-scores"),
+    path("api/judge/assignments", judge.api_assignments, name="api-judge-assignments"),
+    path("api/judge/assignments/<int:pk>/review", judge.api_review, name="api-judge-review"),
 ]

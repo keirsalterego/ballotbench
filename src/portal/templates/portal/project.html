@@ -1,0 +1,19 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ project.title }}{% endblock %}
+{% block content %}
+<p class="muted"><a href="{% url 'gallery' %}?event={{ project.event.slug }}">{{ project.event.name }}</a>{% if project.track %} · {{ project.track.name }}{% endif %}</p>
+<h1>{{ project.title }}</h1>
+{% if project.status == "draft" %}<span class="badge warn">draft, visible to your team and organizers only</span>{% endif %}
+{% if project.duplicate_of_id %}<span class="badge warn">possible duplicate of <a href="{% url 'project' project.duplicate_of_id %}">#{{ project.duplicate_of_id }}</a></span>{% endif %}
+{% if project.tagline %}<p><strong>{{ project.tagline }}</strong></p>{% endif %}
+<p>{{ project.summary }}</p>
+{% if project.description %}<div>{{ project.description|linebreaks }}</div>{% endif %}
+<ul>
+  {% if project.repo_url %}<li>Repository: <a href="{{ project.repo_url }}" rel="nofollow noopener">{{ project.repo_url }}</a></li>{% endif %}
+  {% if project.demo_url %}<li>Demo: <a href="{{ project.demo_url }}" rel="nofollow noopener">{{ project.demo_url }}</a></li>{% endif %}
+  {% if project.submitted_at %}<li>Submitted {{ project.submitted_at|date:"j M Y H:i" }} UTC</li>{% endif %}
+</ul>
+{% for t in project.tags %}<a class="badge" href="{% url 'gallery' %}?tag={{ t|urlencode }}">{{ t }}</a>{% endfor %}
+<h2>Team: {{ project.team.name }}</h2>
+<p class="muted">{{ members|length }} member{{ members|length|pluralize }}</p>
+{% endblock %}

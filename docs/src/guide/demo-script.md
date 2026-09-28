@@ -5,9 +5,13 @@
 `scripts/demo.sh` runs a whole event against the portal and narrates it,
 printing the page to show in the browser at each step:
 
+From a fresh clone, nothing else to set up:
+
 ```sh
-sh scripts/demo.sh --fresh --pause     # empty database, then wait for Enter before each step
-sh scripts/demo.sh                     # run straight through against the running stack
+git clone https://github.com/keirsalterego/ballotbench.git && cd ballotbench
+sh scripts/demo.sh                     # builds and starts the portal if it isn't running, then runs
+sh scripts/demo.sh --fresh --pause     # empty database first, then wait for Enter before each step
+BALLOTBENCH_PORT=9000 sh scripts/demo.sh   # if port 8080 is taken
 ```
 
 It creates a new event each run (Demo Day plus the time), so it can run

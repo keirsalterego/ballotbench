@@ -66,7 +66,9 @@ def event_me(request, slug):
 
 
 class TeamForm(forms.Form):
-    name = forms.CharField(max_length=200)
+    name = forms.CharField(max_length=200, error_messages={
+        "required": "A team needs a name.",
+        "max_length": "A team name can be at most %(limit_value)d characters (this one has %(show_value)d)."})
 
 
 @login_required
@@ -79,11 +81,16 @@ def create_team(request, slug):
         return closed(request, event)
     form = TeamForm(request.POST)
     if not form.is_valid():
-        messages.error(request, "A team needs a name.")
+        messages.error(request, form.errors["name"][0])
+        return redirect("event-me", slug=slug)
+    name = form.cleaned_data["name"]
+    if event.teams.filter(name__iexact=name).exists():
+        messages.error(request, f"There's already a team called {name} in this event. Pick another name, "
+                                "or ask that team for an invite link.")
         return redirect("event-me", slug=slug)
     try:
         with guarded():
-            team = Team.objects.create(event=event, name=form.cleaned_data["name"])
+            team = Team.objects.create(event=event, name=name)
             TeamMember.objects.create(team=team, event=event, user=request.user)
     except APIException as exc:
         messages.error(request, str(exc.detail))

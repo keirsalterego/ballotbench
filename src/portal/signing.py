@@ -111,5 +111,6 @@ def verify(text, public=None):
     try:
         public.verify(_unb64url(doc["signature"]), body)
     except (ValueError, InvalidSignature):
-        return False, "The signature doesn't match: the record was changed after it was signed, or someone else signed it.", record
+        return False, ("The signature doesn't match: the record was changed after it was signed, "
+                       "or someone else signed it."), record
     return True, "Valid: this portal signed exactly this record.", record

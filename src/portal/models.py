@@ -64,6 +64,10 @@ class Event(models.Model):
     voting_open = models.DateTimeField(null=True, blank=True)
     voting_close = models.DateTimeField(null=True, blank=True)
     results_published_at = models.DateTimeField(null=True, blank=True)
+    # The calibration run the published results were frozen to. Later runs
+    # don't change what the public sees until someone publishes again.
+    published_run = models.ForeignKey("CalibrationRun", on_delete=models.PROTECT, null=True, blank=True,
+                                      related_name="+")
     reviews_per_project = models.PositiveSmallIntegerField(default=3)
     max_team_size = models.PositiveSmallIntegerField(default=4)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -276,7 +280,7 @@ class Score(models.Model):
 
 class CalibrationRun(models.Model):
     """One normalization run, kept whole so a published result can be traced
-    back to exactly the scores it read (input_digest)."""
+    back to exactly the scores it read (input_digest). Never edited."""
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="calibration_runs")
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
@@ -284,7 +288,9 @@ class CalibrationRun(models.Model):
     params = models.JSONField(default=dict)
     input_digest = models.CharField(max_length=64)
     connected = models.BooleanField()
-    notes = models.JSONField(default=list)
+    converged = models.BooleanField(default=True)
+    signal_p = models.FloatField(null=True, help_text="permutation p-value: do judges agree more than chance?")
+    n_reviews = models.PositiveIntegerField(default=0)
 
 
 class CalibratedProject(models.Model):

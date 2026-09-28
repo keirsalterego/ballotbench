@@ -54,13 +54,16 @@ def normalize_email(address):
     """One spelling per inbox, so that one inbox gets one ballot. Lowercase,
     and drop a +tag, which nearly every provider delivers to the plain
     address; Gmail also ignores dots and answers to googlemail.com too.
-    Raises ValueError for something that isn't an address."""
-    local, _, domain = address.strip().lower().rpartition("@")
+    It never raises: it also runs over team members' account emails, and one
+    odd address mustn't break every ballot. Something it can't take apart,
+    like +x@example.com, stays as it is, lowercased."""
+    lowered = address.strip().lower()
+    local, _, domain = lowered.rpartition("@")
     local = local.split("+", 1)[0]
     if domain in GMAIL:
         local, domain = local.replace(".", ""), "gmail.com"
     if not local or not domain:
-        raise ValueError(f"not an email address: {address!r}")
+        return lowered
     return f"{local}@{domain}"
 
 
@@ -243,21 +246,33 @@ def ballot(request, slug):
 class EmailForm(forms.Form):
     email = forms.EmailField(max_length=254, label="Your email address")
 
+    def clean_email(self):
+        """A quoted local part ("a.b"@gmail.com) is legal but reaches an
+        inbox normalize_email can't see through, so it could be a second
+        ballot. Nobody needs one to vote."""
+        email = self.cleaned_data["email"].strip()
+        if email.startswith('"'):
+            raise forms.ValidationError("Use the address without quotation marks.")
+        return email
+
 
 @require_POST
 def request_link(request, slug):
     """Mail a one-time link that opens this event's ballot. Every spelling of
     an inbox leads to one voter: a second spelling gets no second ballot
-    (it is logged as vote.duplicate_refused), and the link goes to the
-    address that signed up first, which is the same inbox. The page says the
-    same thing either way, so it can't be used to find out who voted."""
+    (it is logged as vote.duplicate_refused). The link goes to the address
+    just typed, not the one that signed up first: if a provider treats a
+    +tag as a different inbox, whoever typed that spelling first must not
+    get every later link. The link replaces the last one, so only the newest
+    request can open the ballot. The page says the same thing either way, so
+    it can't be used to find out who voted."""
     event = get_object_or_404(Event, slug=slug, voting_mode=Mode.EMAIL)
     if reason := voting_closed_reason(event):
         return render(request, "portal/closed.html", {"event": event, "reason": reason}, status=409)
     form = EmailForm(request.POST)
     if not form.is_valid():
         return render(request, "portal/voting/email.html", {"event": event, "form": form}, status=422)
-    email = form.cleaned_data["email"].strip()
+    email = form.cleaned_data["email"]
     normalized = normalize_email(email)
     try:
         ratelimit.check((ratelimit.ip_key(request, "vote-link"), *LINK_IP_LIMIT),
@@ -279,7 +294,7 @@ def request_link(request, slug):
     send_mail(f"Your ballot for {event.name}",
               f"Open this link to vote in {event.name}:\n\n{link}\n\n"
               "It works once, in the browser you open it in. If you didn't ask for it, ignore this email.",
-              None, [voter.email])
+              None, [email])
     return render(request, "portal/voting/sent.html", {"event": event})
 
 
@@ -426,11 +441,16 @@ def abuse_report(event):
 
 @organizer_required
 def voting_page(request, event):
-    counts = tallies(event)
-    projects = (Project.objects.filter(event=event, status=Project.Status.SUBMITTED, duplicate_of__isnull=True)
-                .select_related("team"))
-    rows = sorted(({"project": p, "votes": counts.get(p.pk, (0, 0))[0], "voters": counts.get(p.pk, (0, 0))[1]}
-                   for p in projects), key=lambda r: (-r["votes"], r["project"].title))
+    """While voting is open the page shows how many ballots there are, not
+    the tallies: with the tallies an organizer could void a ballot and read
+    what it held from the difference."""
+    rows = None
+    if not voting_is_open(event):
+        counts = tallies(event)
+        projects = (Project.objects.filter(event=event, status=Project.Status.SUBMITTED, duplicate_of__isnull=True)
+                    .select_related("team"))
+        rows = sorted(({"project": p, "votes": counts.get(p.pk, (0, 0))[0], "voters": counts.get(p.pk, (0, 0))[1]}
+                       for p in projects), key=lambda r: (-r["votes"], r["project"].title))
     return render(request, "portal/organizer/voting.html", {
         "event": event, "rows": rows, "counted": counted_voters(event), "closed": voting_closed_reason(event),
         "voided": event.voters.filter(voided_at__isnull=False).count(), "cluster_size": CLUSTER_SIZE,
@@ -441,20 +461,18 @@ def voting_page(request, event):
 @organizer_required
 @require_POST
 def void_voter(request, event, pk):
-    """Take a ballot out of the tallies, with a reason, or put it back.
-    The votes themselves are kept, so the decision can be undone."""
-    voter = get_object_or_404(event.voters, pk=pk)
-    before = {"voided_at": voter.voided_at, "voided_reason": voter.voided_reason}
-    if request.POST.get("action") == "unvoid":
-        voter.voided_at, voter.voided_reason, action = None, "", "vote.unvoid"
-    else:
-        reason = request.POST.get("reason", "").strip()[:300]
-        if not reason:
-            messages.error(request, "Say why you're voiding this ballot, for the audit log.")
-            return redirect("voting-manage", slug=event.slug)
-        voter.voided_at, voter.voided_reason, action = db_now(), reason, "vote.void"
+    """Take a ballot out of the tallies, with a reason. It is final: a void
+    that could be undone would let an organizer read one voter's ballot by
+    comparing the tallies with and without it."""
+    voter = get_object_or_404(event.voters, pk=pk, voided_at__isnull=True)
+    reason = request.POST.get("reason", "").strip()[:300]
+    if not reason:
+        messages.error(request, "Say why you're voiding this ballot, for the audit log.")
+        return redirect("voting-manage", slug=event.slug)
+    voter.voided_at, voter.voided_reason = db_now(), reason
     voter.save(update_fields=["voided_at", "voided_reason"])
-    audit.record(action, request=request, event=event, obj=voter, before=before,
+    audit.record("vote.void", request=request, event=event, obj=voter,
+                 before={"voided_at": None, "voided_reason": ""},
                  after={"voided_at": voter.voided_at, "voided_reason": voter.voided_reason})
-    messages.success(request, f"Ballot {voter.pk} is {'out of' if voter.voided_at else 'back in'} the tallies.")
+    messages.success(request, f"Ballot {voter.pk} is out of the tallies for good.")
     return redirect("voting-manage", slug=event.slug)

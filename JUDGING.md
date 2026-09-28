@@ -163,7 +163,7 @@ out, the ranking is computed, and **almost every rank's interval is wide**
 | `jdg_07` scores 4 on everything | flagged `constant`, weight exactly 0 | calibration page, `judges.csv`, the proof |
 | `jdg_01` (and `jdg_23`) have one review | flagged `single_review`, weight 0 | same |
 | two unfinished batches: 8 projects with 2 reviews | shrunk towards the middle, wider intervals, "low coverage" flag, 8 top-ups proposed. One of them, `prj_24`, was reviewed only by two judges the model ignores (both discordant), so it has nothing to be ranked by and is listed as left out until its top-up reviews arrive | progress dashboard, assignment preview, calibration page |
-| `prj_41` repeats `prj_07` (same team, title, repo) | detected at import, `duplicate_of` set, out of the rankings until an organizer decides; its reviews still calibrate its judges | duplicates page, gallery badge, audit log |
+| `prj_41` repeats `prj_07` (same team, title, repo, submitted later) | detected at import, `duplicate_of` set, out of the rankings until an organizer decides; its reviews still calibrate its judges | duplicates page, gallery badge, audit log |
 | judge load 1 to 11 | noise shrinkage trusts busy judges more; new work goes to the idlest | judge table |
 
 ## 8. The proof on the fixture

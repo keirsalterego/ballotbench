@@ -68,20 +68,24 @@ voter's budget: n votes for one project cost n² credits. Send people to
 With the network off, confirmation links can't leave the box. They land in
 **Outbound emails** in the admin, where a site admin can read them.
 
-**Community vote** in the organizer menu shows the tallies as they come in
-(only organizers see them until you publish results, which you can't do
-while voting is open) and a list of things worth a second look: several
+**Community vote** in the organizer menu shows how many ballots are in
+while voting is open, and the tallies once it closes (only organizers see
+them until you publish results, which you can't do while voting is open),
+and a list of things worth a second look: several
 voters on one network, accounts made just before their ballot, identical
 ballots, and sign-ups refused because another spelling of the same inbox
 had already voted. None of these void anything by themselves. If you decide
-a ballot is fake, void it with a reason; it leaves the tallies, the audit
-log records it, and you can count it again later.
+a ballot is fake, void it with a reason; it leaves the tallies for good and
+the audit log records it. There's no undo: voiding a ballot and counting it
+again would show you what that voter chose.
 
 ## Duplicates
 
 When a project has the same repository and title as an earlier one (or the
 same team resubmits the same repository or title), it's flagged and left out
-of the rankings. **Duplicates** lets you confirm it or put it back.
+of the rankings. Only submitted projects count, and the one submitted later
+is the copy. **Duplicates** lets you confirm it or put it back; a project you
+put back is never flagged again.
 
 ## Calibration and results
 

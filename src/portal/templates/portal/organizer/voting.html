@@ -11,7 +11,10 @@
 </dl>
 
 <h2>Tallies</h2>
-<p>Only the organizers see these until the results are published, and results can't be published while voting is open. Voided ballots don't count.</p>
+{% if rows is None %}
+<p>The tallies appear here when voting closes. Until then you see how many ballots there are and what each voter spent, not who they voted for: with live tallies, voiding one ballot would show what it held.</p>
+{% else %}
+<p>Only the organizers see these until the results are published. Voided ballots don't count.</p>
 <div class="table-wrap"><table>
   <thead><tr><th>Project</th><th>Team</th><th class="num">Votes</th><th class="num">Voters</th></tr></thead>
   {% for r in rows %}
@@ -20,9 +23,10 @@
   {% empty %}<tr><td colspan="4" class="muted">No submitted projects yet.</td></tr>
   {% endfor %}
 </table></div>
+{% endif %}
 
 <h2>Things to look at</h2>
-<p>These are reasons to look, not proof. Friends vote alike and offices share a network. Nothing is voided unless you void it.</p>
+<p>These are reasons to look, not proof. Friends vote alike and offices share a network. Nothing is voided unless you void it, and a void can't be undone.</p>
 <ul>
   <li>{{ clusters|length }} network{{ clusters|length|pluralize }} with {{ cluster_size }} or more voters{% if clusters %}: {% for net, vs in clusters %}<code>{{ net }}</code> ({{ vs|length }}){% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}.</li>
   <li>{{ identical|length }} ballot{{ identical|length|pluralize }} cast identically by {{ cluster_size }} or more voters{% if identical %}: {% for vs in identical %}{{ vs|length }} voters ({% for v in vs %}#{{ v.pk }}{% if not forloop.last %}, {% endif %}{% endfor %}){% if not forloop.last %}; {% endif %}{% endfor %}{% endif %}.</li>
@@ -43,10 +47,9 @@
     <td class="num">{{ v.spent }}</td>
     <td class="num">{{ v.ballot|length }}</td>
     <td>{% for f in v.flags %}<span class="flag">{{ f }}</span>{% endfor %}{% if v.voided_at %}<span class="flag bad">voided: {{ v.voided_reason }}</span>{% endif %}</td>
-    <td><form method="post" action="{% url 'voter-void' event.slug v.pk %}" class="filters">{% csrf_token %}
-      {% if v.voided_at %}<button name="action" value="unvoid" class="link">count it again</button>
-      {% else %}<input name="reason" placeholder="Why" required maxlength="300" aria-label="Why void ballot #{{ v.pk }}"><button class="danger">Void</button>{% endif %}
-    </form></td>
+    <td>{% if not v.voided_at %}<form method="post" action="{% url 'voter-void' event.slug v.pk %}" class="filters">{% csrf_token %}
+      <input name="reason" placeholder="Why" required maxlength="300" aria-label="Why void ballot #{{ v.pk }}"><button class="danger">Void for good</button>
+    </form>{% endif %}</td>
   </tr>
   {% empty %}<tr><td colspan="8" class="muted">Nobody has voted yet.</td></tr>
   {% endfor %}

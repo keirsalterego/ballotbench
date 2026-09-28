@@ -69,6 +69,7 @@ close, whichever is first.
 **`portal_project`**: `event`, `team`, `track`, `title`, `tagline`,
 `summary`, `description`, `repo_url`, `demo_url`, `tags` (text array),
 `status` (draft or submitted), `submitted_at`, `duplicate_of` (self),
+`duplicate_cleared` (an organizer said it isn't one; never flagged again),
 `external_id`.
 - unique `(event, external_id)`
 - check: submitted ⇔ `submitted_at` set
@@ -173,7 +174,7 @@ order to their ids. `seq` is assigned under the lock.
 `portal_project`. If the database clock (`now()`) is past the event's
 `submissions_close`, it refuses a new project, a deleted one, or any change to
 content (title, text, links, tags, track, team, status). It allows changes to
-`duplicate_of`, which is organizer bookkeeping.
+`duplicate_of` and `duplicate_cleared`, which are organizer bookkeeping.
 
 The one bypass is the session setting `ballotbench.import`, which only the
 fixture importer and `delete_event` set, with `SET LOCAL` so it ends with

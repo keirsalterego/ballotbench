@@ -34,6 +34,6 @@ deadline, editing reopens straight away.
 ## Duplicates
 
 If your project looks like one submitted earlier (same repository and title),
-it's flagged for the organizers and left out of the rankings until they
+it's flagged when you submit it for the organizers and left out of the rankings until they
 decide. This catches accidental double submissions; if yours is flagged by
 mistake, tell the organizers.

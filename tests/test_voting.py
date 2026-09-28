@@ -81,10 +81,23 @@ def test_normalize_email(typed, inbox):
     assert voting.normalize_email(typed) == inbox
 
 
-@pytest.mark.parametrize("typed", ["+tag@example.org", "nobody", "@example.org", "user@"])
-def test_normalize_email_refuses_non_addresses(typed):
-    with pytest.raises(ValueError):
-        voting.normalize_email(typed)
+@pytest.mark.parametrize("typed", ["+tag@example.org", "+x@Example.com", "nobody", "@example.org", "user@"])
+def test_normalize_email_keeps_what_it_cant_take_apart(typed):
+    assert voting.normalize_email(typed) == typed.lower()
+
+
+def test_one_odd_team_address_doesnt_break_email_ballots(web, ballot, mailoutbox):
+    """normalize_email runs over every team member's address for an email
+    voter's ballot; +x@example.com used to raise, a 500 for every voter."""
+    event, projects = ballot
+    Event.objects.filter(pk=event.pk).update(voting_mode="email")
+    odd = User.objects.create_user("+x@example.com", "pw-for-tests-only")
+    TeamMember.objects.create(team=Team.objects.create(event=event, name="Plus"), event=event, user=odd)
+    client = web()
+    client.post(f"/events/{DEMO}/vote/link", {"email": "honest@example.org"})
+    assert client.post(link_in(mailoutbox[0])).status_code == 302
+    assert client.get(f"/events/{DEMO}/vote").status_code == 200
+    assert web().post(f"/events/{DEMO}/vote/link", {"email": "+y@example.org"}).status_code == 200
 
 
 # The ballot
@@ -283,10 +296,32 @@ def test_one_ballot_per_inbox(web, ballot, mailoutbox):
     response = web().post(f"/events/{DEMO}/vote/link", {"email": "a.b+x@googlemail.com"})
     assert response.status_code == 200, "the page reads the same, so it can't tell anyone who voted"
     assert Voter.objects.filter(event=event).count() == 1
-    assert [m.to for m in mailoutbox] == [["ab@gmail.com"], ["ab@gmail.com"]], "the link goes to the first spelling"
+    assert [m.to for m in mailoutbox] == [["ab@gmail.com"], ["a.b+x@googlemail.com"]], "the link goes where it was asked"
     assert AuditLog.objects.filter(event=event, action="vote.duplicate_refused").count() == 1
     with refused(), transaction.atomic():
         Voter.objects.create(event=event, email="a.b@gmail.com", email_normalized="ab@gmail.com")
+
+
+def test_the_first_spelling_of_an_inbox_doesnt_get_its_later_links(web, ballot, mailoutbox):
+    """Some providers treat a +tag as a different inbox. Whoever asks first
+    with alice+nope@ must not receive alice@'s link, and the newest link is
+    the only one that works."""
+    event, _ = ballot
+    Event.objects.filter(pk=event.pk).update(voting_mode="email")
+    web().post(f"/events/{DEMO}/vote/link", {"email": "alice+nope@yahoo.com"}, REMOTE_ADDR="198.51.100.1")
+    web().post(f"/events/{DEMO}/vote/link", {"email": "alice@yahoo.com"}, REMOTE_ADDR="198.51.100.2")
+    assert [m.to for m in mailoutbox] == [["alice+nope@yahoo.com"], ["alice@yahoo.com"]]
+    assert web().post(link_in(mailoutbox[0])).status_code == 404, "the older link stopped working"
+    assert web().post(link_in(mailoutbox[1])).status_code == 302
+
+
+@pytest.mark.parametrize("typed", ['"ab"@gmail.com', '"a.b+x"@gmail.com'])
+def test_quoted_addresses_are_refused(web, ballot, mailoutbox, typed):
+    event, _ = ballot
+    Event.objects.filter(pk=event.pk).update(voting_mode="email")
+    response = web().post(f"/events/{DEMO}/vote/link", {"email": typed})
+    assert response.status_code == 422 and "quotation marks" in response.content.decode()
+    assert not mailoutbox and not Voter.objects.filter(event=event).exists()
 
 
 def test_email_voter_cant_vote_for_a_team_on_the_same_inbox(ballot):
@@ -352,11 +387,30 @@ def test_voided_ballots_are_out_of_the_tallies(web, ballot):
     assert row.after["voided_reason"] == "same /24 as ten others" and row.object_id == str(sock.pk)
     with refused("voided"), transaction.atomic():
         Vote.objects.create(voter=sock, project=projects[3], votes=1)
-    client.post(f"/events/{DEMO}/manage/voting/voters/{sock.pk}", {"action": "unvoid"})
-    assert voting.tallies(event)[projects[2].pk] == (5, 1)
-    assert AuditLog.objects.filter(action="vote.unvoid", event=event).exists()
     assert web("participant").post(f"/events/{DEMO}/manage/voting/voters/{honest.pk}",
                                    {"reason": "x"}).status_code == 403
+
+
+def test_live_tallies_and_undoable_voids_cant_reveal_a_ballot(web, ballot):
+    """Void a ballot, read the tallies, count it again: the difference was
+    that voter's private ballot. So a void is final, and the tallies stay
+    hidden until voting closes."""
+    event, projects = ballot
+    _, target = cast_directly(event, [{projects[1]: 3}, {projects[2]: 2, projects[3]: 1}])
+    client = web("organizer")
+    page = client.get(f"/events/{DEMO}/manage/voting")
+    assert page.context["rows"] is None and page.context["counted"] == 2
+    assert "appear here when voting closes" in page.content.decode()
+
+    client.post(f"/events/{DEMO}/manage/voting/voters/{target.pk}", {"reason": "checking"})
+    assert client.post(f"/events/{DEMO}/manage/voting/voters/{target.pk}", {"action": "unvoid"}).status_code == 404
+    assert Voter.objects.get(pk=target.pk).voided_at is not None
+    assert not AuditLog.objects.filter(action="vote.unvoid", event=event).exists()
+    assert "count it again" not in client.get(f"/events/{DEMO}/manage/voting").content.decode()
+
+    close_voting(event)
+    rows = {r["project"].pk: r["votes"] for r in client.get(f"/events/{DEMO}/manage/voting").context["rows"]}
+    assert rows[projects[1].pk] == 3 and rows[projects[2].pk] == 0
 
 
 def test_abuse_panel_flags_but_never_voids(web, ballot):

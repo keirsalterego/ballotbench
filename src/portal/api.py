@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from . import audit
 from .access import (Conflict, db_now, guarded, judge_assignments, organizer_events, submissions_closed_reason,
                      visible_projects)
-from .duplicates import find_duplicates
+from .duplicates import flag_on_submit
 from .models import Event, Membership, Project, Review, TeamMember, User
 from .serializers import EventSerializer, ProjectSerializer, ReviewScoresSerializer
 
@@ -21,15 +21,6 @@ PROJECT_FIELDS = ["title", "tagline", "summary", "description", "repo_url", "dem
 def require_submissions_open(event):
     if reason := submissions_closed_reason(event):
         raise Conflict(reason)
-
-
-def flag_duplicates(request, event):
-    for dup, original in find_duplicates(event):
-        if dup.duplicate_of_id is None:
-            dup.duplicate_of = original
-            dup.save(update_fields=["duplicate_of", "updated_at"])
-            audit.record("project.flag_duplicate", request=request, event=event, obj=dup,
-                         after={"duplicate_of": original.pk})
 
 
 def save_project(request, event, project, data, *, created):
@@ -49,7 +40,7 @@ def save_project(request, event, project, data, *, created):
     audit.record(action, request=request, event=event, obj=project, before=before,
                  after=audit.snapshot(project, PROJECT_FIELDS))
     if submit:
-        flag_duplicates(request, event)
+        flag_on_submit(request, event, project)
     return ProjectSerializer(project, context={"event": event}).data
 
 

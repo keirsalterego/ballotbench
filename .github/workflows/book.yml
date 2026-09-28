@@ -12,6 +12,7 @@ on:
       - "ARCHITECTURE.md"
       - "DATA-MODEL.md"
       - "NOTES.md"
+      - "THREAT-MODEL.md"
       - ".github/workflows/book.yml"
   workflow_dispatch:
 

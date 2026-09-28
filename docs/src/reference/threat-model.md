@@ -1,0 +1,1 @@
+{{#include ../../../THREAT-MODEL.md}}

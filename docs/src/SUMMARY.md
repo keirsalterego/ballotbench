@@ -20,6 +20,7 @@
 
 - [Architecture](reference/architecture.md)
 - [Data model](reference/data-model.md)
+- [Threat model](reference/threat-model.md)
 - [The API](reference/api.md)
 - [Running it for real](reference/operations.md)
 - [The acceptance checker](reference/checker.md)

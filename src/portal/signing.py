@@ -1,4 +1,4 @@
-"""Ed25519 signatures for participation records.
+"""Ed25519 signatures for participation records and published results.
 
 A record is a small JSON object; what gets signed is its canonical form
 (sorted keys, no spaces, UTF-8), so anyone can check a record with nothing
@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from django.conf import settings
 
-MAX_LENGTH = 20_000     # a real record is under 1 kB
+MAX_LENGTH = 400_000    # a record is under 1 kB; a signed results table for 1000 projects is about 100 kB
 SHAPE = 'expected {"record": {...}, "signature": "..."}'
 
 

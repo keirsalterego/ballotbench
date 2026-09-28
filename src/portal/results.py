@@ -6,6 +6,7 @@ one calibration run; a later run changes nothing public until someone
 publishes again. While a community vote is open, results can't be published
 and published ones are hidden again, so nobody votes with the judges'
 ranking in front of them."""
+
 from django.contrib import messages
 from django.db import transaction
 from django.http import Http404
@@ -16,7 +17,7 @@ from rest_framework import permissions, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from . import audit, pairwise
+from . import audit, pairwise, signing
 from .access import db_now, is_organizer
 from .calibration import bootstrap, digest, fit, kingmakers, signal_test
 from .models import CalibratedProject, CalibrationRun, Event, JudgeCalibration, Review
@@ -182,6 +183,38 @@ def results_page(request, slug):
                                                    "community": community is not None})
 
 
+def results_receipt(event):
+    """The published results as one signed document: what anyone needs to
+    hold the portal to its ranking later, and check it offline with the
+    public key. Only published results are ever signed."""
+    run = event.published_run
+    rows = [r for r in ranking(run) if r.rank]
+    return signing.sign({
+        "kind": "results", "version": 1, "issuer": "ballotbench",
+        "event": {"slug": event.slug, "name": event.name},
+        "published_at": event.results_published_at.isoformat(), "run": run.pk, "method": run.method,
+        "input_digest": run.input_digest,
+        "ranking": [{"rank": r.rank, "project": r.project.external_id or str(r.project_id), "title": r.project.title,
+                     "calibrated": round(r.display, 4), "could_be": [r.rank_low, r.rank_high]} for r in rows],
+    })
+
+
+@extend_schema(responses={200: inline_serializer("SignedResults", {
+    "record": serializers.DictField(), "signature": serializers.CharField()})},
+    description="The published results, signed with the portal's Ed25519 key. Check it at /verify or offline "
+                "with the key at /.well-known/ballotbench-signing-key. 404 until results are published, and "
+                "while a community vote is open.")
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def api_signed_results(request, slug):
+    event = get_object_or_404(Event, slug=slug)
+    if event.published_run_id is None or voting_is_open(event):
+        raise Http404
+    response = Response(results_receipt(event))
+    response["Content-Disposition"] = f'inline; filename="{event.slug}-results.signed.json"'
+    return response
+
+
 ResultRow = inline_serializer("ResultRow", {
     "rank": serializers.IntegerField(), "raw_rank": serializers.IntegerField(), "project": serializers.IntegerField(),
     "title": serializers.CharField(), "team": serializers.CharField(), "calibrated": serializers.FloatField(),
@@ -212,7 +245,7 @@ def api_results(request, slug):
              "team": r.project.team.name, "calibrated": round(r.display, 4), "se": round(r.se, 4),
              "raw_mean": round(r.raw_mean, 4), "reviews": r.n_reviews, "rank_interval": [r.rank_low, r.rank_high]}
             for r in ranking(run) if r.rank]
-    body = {"event": event.slug, "published_at": event.results_published_at, "run": run.pk,
+    body = {"event": event.slug, "published_at": event.results_published_at.isoformat(), "run": run.pk,
             "input_digest": run.input_digest, "method": run.method, "projects": rows}
     if community is not None:
         body["community_voters"] = counted_voters(event)

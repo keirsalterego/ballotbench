@@ -164,3 +164,19 @@ def test_a_password_reset_confirms_the_address(web):
     form_url = client.get(link, follow=True).redirect_chain[-1][0]
     client.post(form_url, {"new_password1": "another good passphrase", "new_password2": "another good passphrase"})
     assert User.objects.get(pk=user.pk).email_confirmed_at is not None
+
+
+def test_address_limits_scale_for_a_venue_but_account_limits_do_not(monkeypatch, rf):
+    from portal import ratelimit
+    monkeypatch.setenv("BALLOTBENCH_ADDRESS_LIMIT_SCALE", "10")
+    request = rf.post("/", REMOTE_ADDR="198.51.100.7")
+    key = ratelimit.ip_key(request, "scale-test")
+    assert sum(ratelimit.allow(key, 2, 600) for _ in range(25)) == 20          # 2 per person, room for 10
+    assert sum(ratelimit.allow("per-account:x", 2, 600) for _ in range(5)) == 2
+
+
+def test_guessing_one_accounts_password_is_capped_whatever_the_address(web):
+    client = web()
+    codes = [client.post("/login", {"username": "priya1@example.org", "password": f"wrong-{i}"},
+                         REMOTE_ADDR=f"203.0.113.{i}").status_code for i in range(12)]
+    assert codes[:10] == [200] * 10 and codes[-1] == 429

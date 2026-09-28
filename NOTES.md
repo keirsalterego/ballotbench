@@ -163,3 +163,31 @@ organizer's "it's different" lasted until the next submit. Now only
 submitted projects count, earlier means `submitted_at`, a submit only flags
 the project being submitted, and `duplicate_cleared` keeps an organizer's
 call.
+
+## What a stranger found in an hour
+
+With every test green, I had someone follow the book's tour from a fresh
+clone, as a judge would, and write down everything that disagreed with it.
+It found 28 things. The ones that stung:
+
+- **"Save draft" after submitting quietly replaced the submitted scores.**
+  The review stayed "submitted", with the old timestamp, and calibration read
+  the new numbers. Every test submitted once and stopped. A submitted review
+  now only resubmits.
+- **Deleting a rubric criterion after scoring was a 500.** Changing a weight
+  was refused politely by the trigger; deleting went through a foreign key
+  set to RESTRICT, and nobody had wrapped that path. The same shape as the
+  track bug the security review found an hour earlier: a database refusal
+  reached from a path the app didn't guard.
+- **The venue problem.** Rate limits per address are right against a flood
+  and wrong at a hackathon, where three hundred people share one NAT
+  address. The walkthrough locked itself out after twenty ordinary logins.
+  Per-address limits now scale for a crowd, and a per-account limit does the
+  job of stopping someone guessing one person's password.
+- **The offline proof published no port.** `internal: true` networks can't
+  publish ports, so following the README gave a stranger nothing to open.
+  The honest instruction is simpler: switch off the Wi-Fi.
+
+None of these were security holes and all of them would have been on camera
+in a demo. Reading the docs aloud against the running thing is a test
+nothing else replaces.

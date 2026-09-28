@@ -1,0 +1,24 @@
+{% extends "portal/base.html" %}
+{% block title %}Possible duplicates{% endblock %}
+{% block content %}
+<h1>Possible duplicates</h1>
+{% include "portal/organizer/_nav.html" %}
+<p>A project is flagged when it has the same repository and title as an earlier one, or the same team resubmitted the same repository or title.
+  Flagged projects stay out of the rankings until you decide. Their reviews are kept either way.</p>
+{% for p in flagged %}
+<section class="sheet">
+  <h2><a href="{% url 'project' p.pk %}">{{ p.title }}</a> by {{ p.team.name }}</h2>
+  <p>Looks like <a href="{% url 'project' p.duplicate_of_id %}">{{ p.duplicate_of.title }}</a> by {{ p.duplicate_of.team.name }}, submitted first.</p>
+  <dl class="facts">
+    <dt>This one</dt><dd>{{ p.repo_url|default:"no repository" }}, submitted {{ p.submitted_at|date:"j M Y H:i" }}</dd>
+    <dt>The earlier one</dt><dd>{{ p.duplicate_of.repo_url|default:"no repository" }}, submitted {{ p.duplicate_of.submitted_at|date:"j M Y H:i" }}</dd>
+  </dl>
+  <form method="post" action="{% url 'duplicate-resolve' event.slug p.pk %}" class="actions">{% csrf_token %}
+    <button name="decision" value="duplicate">It's a duplicate: keep it out</button>
+    <button name="decision" value="distinct" class="quiet">It's a different project: rank it</button>
+  </form>
+</section>
+{% empty %}
+<p>No duplicates flagged.</p>
+{% endfor %}
+{% endblock %}

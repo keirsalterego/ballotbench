@@ -6,8 +6,8 @@ from django.contrib import admin
 
 from . import audit
 from .access import submissions_closed_reason
-from .models import (ApiToken, AuditLog, Event, JudgeAssignment, Membership, Prize, Project, RoleInvite,
-                     RubricCriterion, Team, TeamMember, Track, User)
+from .models import (ApiToken, AuditLog, Event, JudgeAssignment, Membership, OutboundEmail, Prize, Project,
+                     RoleInvite, RubricCriterion, Team, TeamMember, Track, User)
 
 
 class AuditedAdmin(admin.ModelAdmin):
@@ -90,12 +90,7 @@ class MembershipAdmin(AuditedAdmin):
     list_filter = ["event", "role"]
 
 
-@admin.register(AuditLog)
-class AuditLogAdmin(admin.ModelAdmin):
-    """Read only. The table refuses UPDATE and DELETE anyway."""
-    list_display = ["seq", "ts", "actor", "event", "action", "object_type", "object_id"]
-    list_filter = ["action", "event"]
-
+class ReadOnlyAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
@@ -104,6 +99,22 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(ReadOnlyAdmin):
+    """Read only. The table refuses UPDATE and DELETE anyway."""
+    list_display = ["seq", "ts", "actor", "event", "action", "object_type", "object_id"]
+    list_filter = ["action", "event"]
+
+
+@admin.register(OutboundEmail)
+class OutboundEmailAdmin(ReadOnlyAdmin):
+    """The mail the portal would have sent: confirmation links for voters.
+    Read only, so what an admin reads is what the portal wrote."""
+    list_display = ["created_at", "to", "subject"]
+    search_fields = ["to", "subject"]
+    ordering = ["-created_at"]
 
 
 for model in (TeamMember, RubricCriterion, JudgeAssignment, RoleInvite, ApiToken):

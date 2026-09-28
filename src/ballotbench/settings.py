@@ -1,6 +1,7 @@
 """Settings come from the environment, so the same image runs the demo and a
-real deployment. Nothing here reaches the network: email goes to the console
-and every static file is served from the image."""
+real deployment. Nothing here reaches the network: email is kept in the
+database for site admins to read, and every static file is served from the
+image."""
 import os
 from pathlib import Path
 
@@ -97,7 +98,7 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = env("DJANGO_EMAIL_BACKEND", "portal.mail.OutboxBackend")
 
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"

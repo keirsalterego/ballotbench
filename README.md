@@ -71,6 +71,7 @@ Two events are seeded:
 ### Check it yourself
 
 ```sh
+sh scripts/demo.sh --fresh --pause                                # a whole event, narrated, step by step
 python3 run.py .dogfood.toml                                      # the official checker
 sh scripts/isolation_curl.sh                                      # tries to reach what it shouldn't, and checks public pages stay public
 docker compose exec web python manage.py normalization_proof      # every number in JUDGING.md, recomputed

@@ -1,5 +1,35 @@
 # The five-minute demo
 
+## The automatic version
+
+`scripts/demo.sh` runs a whole event against the portal and narrates it,
+printing the page to show in the browser at each step:
+
+```sh
+sh scripts/demo.sh --fresh --pause     # empty database, then wait for Enter before each step
+sh scripts/demo.sh                     # run straight through against the running stack
+```
+
+It creates a new event each run (Demo Day plus the time), so it can run
+again without a reset. In twelve steps:
+1. An organizer creates the event, with a track, a prize and a weighted rubric.
+2. Four judges accept single-use invites.
+3. Four teams sign up and submit; one invites a teammate.
+4. The deadline passes: a late edit is refused by the API and the page.
+5. The organizer hands out reviews.
+6. Four judges score: harsh, generous, steady, and one who gives everything a 3.
+7. Isolation attacks between judges and teams are refused.
+8. Calibration flags the constant judge and ranks with honest ranges.
+9. A community vote with a quadratic budget, each voter in their own order,
+   and publishing refused while it's open.
+10. Publishing, the signed results verified, a doctored copy refused.
+11. A team reads why it placed where it did; another team can't.
+12. The exports and the audit trail.
+
+It needs only Python 3 (standard library) and, for `--fresh`, Docker.
+
+## By hand
+
 A shot list for recording one full event lifecycle (create, submit, judge,
 publish) in five minutes. It uses both seeded events: the open **Demo Hack**
 for the live lifecycle, and **Sample Hack 2026** (the fixture, 126 real

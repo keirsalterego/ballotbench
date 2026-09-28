@@ -387,11 +387,30 @@ def test_voided_ballots_are_out_of_the_tallies(web, ballot):
     assert row.after["voided_reason"] == "same /24 as ten others" and row.object_id == str(sock.pk)
     with refused("voided"), transaction.atomic():
         Vote.objects.create(voter=sock, project=projects[3], votes=1)
-    client.post(f"/events/{DEMO}/manage/voting/voters/{sock.pk}", {"action": "unvoid"})
-    assert voting.tallies(event)[projects[2].pk] == (5, 1)
-    assert AuditLog.objects.filter(action="vote.unvoid", event=event).exists()
     assert web("participant").post(f"/events/{DEMO}/manage/voting/voters/{honest.pk}",
                                    {"reason": "x"}).status_code == 403
+
+
+def test_live_tallies_and_undoable_voids_cant_reveal_a_ballot(web, ballot):
+    """Void a ballot, read the tallies, count it again: the difference was
+    that voter's private ballot. So a void is final, and the tallies stay
+    hidden until voting closes."""
+    event, projects = ballot
+    _, target = cast_directly(event, [{projects[1]: 3}, {projects[2]: 2, projects[3]: 1}])
+    client = web("organizer")
+    page = client.get(f"/events/{DEMO}/manage/voting")
+    assert page.context["rows"] is None and page.context["counted"] == 2
+    assert "appear here when voting closes" in page.content.decode()
+
+    client.post(f"/events/{DEMO}/manage/voting/voters/{target.pk}", {"reason": "checking"})
+    assert client.post(f"/events/{DEMO}/manage/voting/voters/{target.pk}", {"action": "unvoid"}).status_code == 404
+    assert Voter.objects.get(pk=target.pk).voided_at is not None
+    assert not AuditLog.objects.filter(action="vote.unvoid", event=event).exists()
+    assert "count it again" not in client.get(f"/events/{DEMO}/manage/voting").content.decode()
+
+    close_voting(event)
+    rows = {r["project"].pk: r["votes"] for r in client.get(f"/events/{DEMO}/manage/voting").context["rows"]}
+    assert rows[projects[1].pk] == 3 and rows[projects[2].pk] == 0
 
 
 def test_abuse_panel_flags_but_never_voids(web, ballot):

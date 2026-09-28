@@ -441,11 +441,16 @@ def abuse_report(event):
 
 @organizer_required
 def voting_page(request, event):
-    counts = tallies(event)
-    projects = (Project.objects.filter(event=event, status=Project.Status.SUBMITTED, duplicate_of__isnull=True)
-                .select_related("team"))
-    rows = sorted(({"project": p, "votes": counts.get(p.pk, (0, 0))[0], "voters": counts.get(p.pk, (0, 0))[1]}
-                   for p in projects), key=lambda r: (-r["votes"], r["project"].title))
+    """While voting is open the page shows how many ballots there are, not
+    the tallies: with the tallies an organizer could void a ballot and read
+    what it held from the difference."""
+    rows = None
+    if not voting_is_open(event):
+        counts = tallies(event)
+        projects = (Project.objects.filter(event=event, status=Project.Status.SUBMITTED, duplicate_of__isnull=True)
+                    .select_related("team"))
+        rows = sorted(({"project": p, "votes": counts.get(p.pk, (0, 0))[0], "voters": counts.get(p.pk, (0, 0))[1]}
+                       for p in projects), key=lambda r: (-r["votes"], r["project"].title))
     return render(request, "portal/organizer/voting.html", {
         "event": event, "rows": rows, "counted": counted_voters(event), "closed": voting_closed_reason(event),
         "voided": event.voters.filter(voided_at__isnull=False).count(), "cluster_size": CLUSTER_SIZE,
@@ -456,20 +461,18 @@ def voting_page(request, event):
 @organizer_required
 @require_POST
 def void_voter(request, event, pk):
-    """Take a ballot out of the tallies, with a reason, or put it back.
-    The votes themselves are kept, so the decision can be undone."""
-    voter = get_object_or_404(event.voters, pk=pk)
-    before = {"voided_at": voter.voided_at, "voided_reason": voter.voided_reason}
-    if request.POST.get("action") == "unvoid":
-        voter.voided_at, voter.voided_reason, action = None, "", "vote.unvoid"
-    else:
-        reason = request.POST.get("reason", "").strip()[:300]
-        if not reason:
-            messages.error(request, "Say why you're voiding this ballot, for the audit log.")
-            return redirect("voting-manage", slug=event.slug)
-        voter.voided_at, voter.voided_reason, action = db_now(), reason, "vote.void"
+    """Take a ballot out of the tallies, with a reason. It is final: a void
+    that could be undone would let an organizer read one voter's ballot by
+    comparing the tallies with and without it."""
+    voter = get_object_or_404(event.voters, pk=pk, voided_at__isnull=True)
+    reason = request.POST.get("reason", "").strip()[:300]
+    if not reason:
+        messages.error(request, "Say why you're voiding this ballot, for the audit log.")
+        return redirect("voting-manage", slug=event.slug)
+    voter.voided_at, voter.voided_reason = db_now(), reason
     voter.save(update_fields=["voided_at", "voided_reason"])
-    audit.record(action, request=request, event=event, obj=voter, before=before,
+    audit.record("vote.void", request=request, event=event, obj=voter,
+                 before={"voided_at": None, "voided_reason": ""},
                  after={"voided_at": voter.voided_at, "voided_reason": voter.voided_reason})
-    messages.success(request, f"Ballot {voter.pk} is {'out of' if voter.voided_at else 'back in'} the tallies.")
+    messages.success(request, f"Ballot {voter.pk} is out of the tallies for good.")
     return redirect("voting-manage", slug=event.slug)

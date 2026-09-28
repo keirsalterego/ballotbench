@@ -1,0 +1,18 @@
+{% extends "portal/base.html" %}
+{% block title %}Results: {{ event.name }}{% endblock %}
+{% block content %}
+<h1>{{ event.name }} results</h1>
+{% if preview %}<p class="flag">Preview. Only organizers can see this until the results are published.</p>
+{% else %}<p>Published {{ event.results_published_at|date:"j F Y, H:i" }} UTC.</p>{% endif %}
+<p>Each project's score is the judges' rubric scores with every judge's habits taken out: how lenient they were, and how widely they spread their marks. The ± shows how sure that is; overlapping ranges are close to a tie.</p>
+<ol class="docket" style="display:block">
+{% for r in rows %}
+  <li>
+    <h2>{{ r.rank }}. <a href="{% url 'project' r.project_id %}">{{ r.project.title }}</a></h2>
+    <p class="by">by {{ r.project.team.name }}{% if r.project.track %}, in {{ r.project.track.name }}{% endif %}</p>
+    <p class="num">{{ r.display|floatformat:3 }} ± {{ r.se|floatformat:3 }}, from {{ r.n_reviews }} review{{ r.n_reviews|pluralize }}</p>
+  </li>
+{% endfor %}
+</ol>
+<p class="faint">Scores fingerprint <code>{{ run.input_digest }}</code>: anyone with the scores can check this result was computed from them.</p>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "portal/base.html" %}
+{% block title %}Results not published{% endblock %}
+{% block content %}
+<h1>{{ event.name }} results aren't public yet</h1>
+<p>The organizers publish them once judging is finished. Until then, nobody outside the organizing team can see scores or rankings.</p>
+<p><a href="{% url 'gallery' %}?event={{ event.slug }}">See the projects</a></p>
+{% endblock %}

@@ -10,7 +10,7 @@
   {% if error %}<p class="badge bad">{{ error }}</p>{% endif %}
   {% if anonymous %}
     <p><a href="{% url 'login' %}?next={{ request.path|urlencode }}">Log in</a> or <a href="{% url 'signup' %}?next={{ request.path|urlencode }}">sign up</a> first, then come back to this link.</p>
-  {% else %}
+  {% elif not error %}
     <form method="post">{% csrf_token %}<button>Join the team</button></form>
   {% endif %}
 {% endif %}

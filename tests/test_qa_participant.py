@@ -56,3 +56,17 @@ def test_a_team_name_already_taken_in_the_event_is_refused(me):
     assert event.teams.count() == 1
 
 
+def test_a_full_team_offers_no_invite_and_its_links_no_join_button(me, web):
+    client, event, user = me
+    Event.objects.filter(pk=event.pk).update(max_team_size=1)
+    team = on_team(event, user)
+    page = client.get(f"/events/{event.slug}/me").content.decode()
+    assert "Your team is full" in page and "Make an invite link" not in page
+    TeamInvite.objects.create(team=team, token_hash=_hash("qa-token"), created_by=user,
+                              expires_at=db_now() + timedelta(hours=1))
+    stranger = web()
+    stranger.force_login(User.objects.create_user("qa-stranger@example.org", "pw-for-tests-only"))
+    page = stranger.get("/invite/qa-token").content.decode()
+    assert "This team is full." in page and "Join the team" not in page
+
+

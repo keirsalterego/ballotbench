@@ -27,6 +27,10 @@ def _hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def team_is_full(team):
+    return team.members.count() >= team.event.max_team_size
+
+
 def closed(request, event, template="portal/closed.html"):
     """The page for a write refused because the window is shut: 409."""
     return render(request, template, {"event": event, "reason": submissions_closed_reason(event)}, status=409)
@@ -60,7 +64,7 @@ def event_me(request, slug):
         "members": team.members.select_related("user") if team else [],
         "projects": team.projects.all() if team else [],
         "invites": team.invites.filter(used_at__isnull=True, expires_at__gt=db_now()) if team else [],
-        "closed": submissions_closed_reason(event),
+        "closed": submissions_closed_reason(event), "full": team is not None and team_is_full(team),
         "new_link": request.session.pop("new_invite_link", None),
     })
 
@@ -117,6 +121,9 @@ def create_invite(request, pk):
     team = _my_team(request, pk)
     if submissions_closed_reason(team.event):
         return closed(request, team.event)
+    if team_is_full(team):
+        messages.error(request, "Your team is full, so there's nobody left to invite.")
+        return redirect("event-me", slug=team.event.slug)
     token = secrets.token_urlsafe(24)
     expires = min(db_now() + INVITE_LIFETIME, team.event.submissions_close)
     invite = TeamInvite.objects.create(team=team, token_hash=_hash(token), created_by=request.user, expires_at=expires)
@@ -145,7 +152,8 @@ def accept_invite(request, token):
     if not request.user.is_authenticated:
         return render(request, "portal/participant/invite.html", {"team": team, "event": event, "anonymous": True})
     if request.method != "POST":
-        return render(request, "portal/participant/invite.html", {"team": team, "event": event})
+        full = "This team is full." if team_is_full(team) else None
+        return render(request, "portal/participant/invite.html", {"team": team, "event": event, "error": full})
     if submissions_closed_reason(event):
         return closed(request, event)
     try:

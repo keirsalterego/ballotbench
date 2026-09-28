@@ -16,7 +16,7 @@ from rest_framework.response import Response
 
 from . import audit, pairwise
 from .access import db_now, is_organizer
-from .calibration import bootstrap, digest, fit, signal_test
+from .calibration import bootstrap, digest, fit, kingmakers, signal_test
 from .models import CalibratedProject, CalibrationRun, Event, JudgeCalibration, Review
 from .organizer import organizer_required
 from .progress import rankable_projects
@@ -105,10 +105,21 @@ def calibration_page(request, event):
         row.moved = (row.raw_rank - row.rank) if row.rank and row.raw_rank else None
         row.pairwise_rank = pairwise_rank.get(row.project_id)
     judges = (run.judges.select_related("judge").order_by("flag", "judge__email") if run else [])
+    podium = max(1, event.prizes.count() or 3)
+    decisive = []
+    if run:
+        criteria = list(event.criteria.all())
+        obs = [(r.assignment.judge_id, r.assignment.project_id, y) for r in submitted_reviews(event)
+               if (y := weighted_score(r, criteria)) is not None]
+        titles = {r.project_id: r.project.title for r in rows}
+        people = {j.judge_id: j.judge for j in judges}
+        decisive = [{"judge": people.get(j), "entered": [titles.get(p, p) for p in entered],
+                     "left": [titles.get(p, p) for p in left]}
+                    for j, entered, left in kingmakers(obs, {r.project_id for r in rows if r.rank}, podium)]
     return render(request, "portal/organizer/calibration.html", {
         "event": event, "run": run, "rows": rows, "judges": judges,
         "flagged": [j for j in judges if j.flag != "ok"],
-        "k": event.reviews_per_project,
+        "k": event.reviews_per_project, "decisive": decisive, "podium": podium,
         "runs": event.calibration_runs.order_by("-pk")[:10],
     })
 

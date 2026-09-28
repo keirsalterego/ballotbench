@@ -35,6 +35,18 @@
 </table></div>
 {% endif %}
 
+<h2>Does one judge decide the podium?</h2>
+<p>For each judge, the calibration was run again without their reviews. If the top {{ podium }} changes, the podium rests on that one person.
+  That isn't an accusation: it's where a second look, or one more review, is worth it before publishing.</p>
+{% if decisive %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Without this judge</th><th>would enter the top {{ podium }}</th><th>would drop out</th></tr></thead>
+  <tbody>{% for d in decisive %}<tr><td>{{ d.judge.name|default:d.judge.email }}</td><td>{{ d.entered|join:", " }}</td><td>{{ d.left|join:", " }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}
+<p class="flag good">No single judge's absence changes the top {{ podium }}.</p>
+{% endif %}
+
 <h2>Ranking</h2>
 <p><strong>Pairwise</strong> is a second opinion: every judge who scored two projects differently is read as picking the better one, and the picks are ranked with a Bradley-Terry model. It ignores how far apart a judge put two projects, so no way of using the scale can move it. Where it and the calibrated rank agree, trust the rank more.</p>
 <p>Calibrated scores are on the rubric's 0 to 1 scale. <strong>Could be</strong> is the range the rank lands in 90% of the time when each project's reviews are resampled and everything is refitted: a wide range means the scores can't tell this project from its neighbours.</p>

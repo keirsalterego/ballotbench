@@ -70,3 +70,17 @@ def test_podium_topups_go_to_projects_that_could_cross_the_prize_line(web, run):
     assert {a.project_id for a in added} <= {r.project_id for r in rows}
     assert len({a.project_id for a in added}) == len(added)          # one more each, not several
     assert AuditLog.objects.filter(action="assignment.podium_topup").exists()
+
+
+def test_signed_results_exist_only_once_published_and_verify(api, web, run):
+    import json
+    from portal import signing
+    assert api().get(f"/api/events/{EVENT}/results/signed").status_code == 404
+    web("organizer").post(f"/events/{EVENT}/manage/publish")
+    receipt = api().get(f"/api/events/{EVENT}/results/signed").json()
+    assert receipt["record"]["kind"] == "results" and receipt["record"]["input_digest"] == run.input_digest
+    assert signing.verify(json.dumps(receipt))[0]
+    receipt["record"]["ranking"][0]["rank"] = 2           # anyone tampering with it
+    assert not signing.verify(json.dumps(receipt))[0]
+    page = web().post("/verify", {"record": json.dumps(api().get(f"/api/events/{EVENT}/results/signed").json())})
+    assert "Valid" in page.content.decode()

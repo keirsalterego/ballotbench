@@ -36,7 +36,6 @@ def scores_for(event, value=3):
     return {c.key: value for c in event.criteria.all()}
 
 
-
 def test_deleting_a_scored_criterion_is_refused_not_a_500(web, event):
     criterion = RubricCriterion.objects.filter(event=event, score__isnull=False).first()
     response = web("organizer").post(f"/events/{EVENT}/manage/rubric/{criterion.pk}/delete", follow=True)
@@ -190,3 +189,22 @@ def test_recusal_needs_a_reason(web, event):
 def test_saving_a_track_says_so(web):
     response = web("organizer").post(f"/events/{DEMO}/manage/tracks", {"name": "Saved track"}, follow=True)
     assert "Saved." in response.content.decode()
+
+
+def test_api_docs_render_code_use_this_host_and_describe_every_route(web):
+    page = web().get("/api/docs", SERVER_NAME="localhost", SERVER_PORT="8123").content.decode()
+    assert "`" not in page and "<code>Authorization: Bearer &lt;token&gt;</code>" in page
+    assert "http://localhost:8123/api/judge/scores" in page and "localhost:8080" not in page
+    assert "<td></td>" not in page
+
+
+def test_the_certificate_links_the_key_in_full(web):
+    page = web("judge_a").get(f"/events/{EVENT}/certificate").content.decode()
+    assert 'href="http://testserver/.well-known/ballotbench-signing-key"' in page
+
+
+def test_calibration_heading_matches_the_nav_and_the_audit_log_names_things(web, event):
+    client = web("organizer")
+    assert "<h1>Calibration and results</h1>" in client.get(f"/events/{EVENT}/manage/calibration").content.decode()
+    page = client.get(f"/events/{EVENT}/manage/audit").content.decode()
+    assert f"event {EVENT}" in page

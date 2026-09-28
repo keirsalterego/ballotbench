@@ -19,7 +19,7 @@
     <td class="num">{{ a.seq }}</td>
     <td>{{ a.ts|date:"j M H:i:s" }}</td>
     <td>{{ a.actor.email|default:"system" }}{% if a.ip %}<span class="hint">{{ a.ip }}</span>{% endif %}</td>
-    <td>{{ a.action }}{% if a.object_type %}<span class="hint">{{ a.object_type }} {{ a.object_id }}</span>{% endif %}</td>
+    <td>{{ a.action }}{% if a.object_type %}<span class="hint">{{ a.object_type }} {{ a.label|default:a.object_id }}</span>{% endif %}</td>
     <td>{% if a.before or a.after %}<details><summary>show</summary>
       {% if a.before %}<p>Before</p><pre>{{ a.before|pprint }}</pre>{% endif %}
       {% if a.after %}<p>After</p><pre>{{ a.after|pprint }}</pre>{% endif %}

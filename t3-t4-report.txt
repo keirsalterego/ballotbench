@@ -1,0 +1,87 @@
+DOGFOOD 2026 T3/T4 report (scripts/check_t3_t4.py; run.py covers T1 and T2)
+portal: http://localhost:8099
+
+T3  community voting, authenticated ............. PASS
+       POST /api/events/chk-051340-a/ballot  as anonymous  -> 401
+       GET /api/events/chk-051340-a/ballot  as priya1@example.org  -> 200
+       POST /api/events/chk-051340-a/ballot  as priya1@example.org  -> 200
+       GET /api/events/chk-051340-a/ballot  as chk-051340-fresh@example.org  -> 403
+T3  community voting, quadratic budget .......... PASS
+       POST /api/events/chk-051340-a/ballot  as ines.rocha@example.org  -> 409
+       POST /api/events/chk-051340-a/ballot  as ines.rocha@example.org  -> 200
+T3  community voting, email gated ............... PASS
+       POST /events/chk-051340-e/vote/link  as chk.051340+first@gmail.com  -> 200
+       GET /admin/portal/outboundemail/?q=chk.051340%2Bfirst%40gmail.com  as admin@ballotbench.local  -> 200
+       GET /admin/portal/outboundemail/14/change/  as admin@ballotbench.local  -> 200
+       GET /vote/confirm/yBhpsN9pFK0f2SxajVwZ8gz-YfkFhnsr_g-6weYMhRs  as chk.051340+first@gmail.com  -> 200
+       POST /vote/confirm/yBhpsN9pFK0f2SxajVwZ8gz-YfkFhnsr_g-6weYMhRs  as chk.051340+first@gmail.com  -> 302
+       GET /events/chk-051340-e/vote  as chk.051340+first@gmail.com  -> 200
+       POST /events/chk-051340-e/vote  as chk.051340+first@gmail.com  -> 302
+       GET /events/chk-051340-e/vote  as anonymous  -> 200
+T3  project comments ............................ PASS
+       POST /api/projects/45/comments  as anonymous  -> 401
+       POST /api/projects/45/comments  as diego.herrera@example.org  -> 201
+       GET /api/projects/45/comments  as anonymous  -> 200
+       POST /comments/1/moderate  as organizer@ballotbench.local  -> 302
+       GET /api/projects/45/comments  as anonymous  -> 200
+T3  randomized project ordering on ballots ...... PASS
+       GET /api/events/chk-051340-a/ballot  as priya1@example.org  -> 200
+       GET /api/events/chk-051340-a/ballot  as ines.rocha@example.org  -> 200
+       GET /api/events/chk-051340-a/ballot  as diego.herrera@example.org  -> 200
+       GET /api/events/chk-051340-a/ballot  as priya1@example.org  -> 200
+       orders: 42,44,45,46,43 | 45,42,44,46,43 | 44,42,43,46,45
+T3  results hidden during the voting window ..... PASS
+       POST /events/chk-051340-a/manage/calibration  as organizer@ballotbench.local  -> 302
+       POST /events/chk-051340-a/manage/publish  as organizer@ballotbench.local  -> 409
+       GET /api/events/chk-051340-a/results  as anonymous  -> 404
+       GET /api/events/chk-051340-a/results  as priya1@example.org  -> 404
+       POST /events/chk-051340-a/manage  as organizer@ballotbench.local  -> 302
+       POST /events/chk-051340-a/manage/publish  as organizer@ballotbench.local  -> 302
+       GET /api/events/chk-051340-a/results  as anonymous  -> 200
+T3  anti-abuse: rate limits ..................... PASS
+       POST /api/events/chk-051340-f/ballot x22  as diego.herrera@example.org  -> [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 429, 429]
+T3  anti-abuse: duplicate detection ............. PASS
+       POST /events/chk-051340-e/vote/link  as anonymous  -> 200
+       GET /api/events/chk-051340-e/export/audit.csv  as bb_demo_organizer_5c1e  -> 200
+       GET /api/events/sample-hack-2026/projects  as anonymous  -> 200
+T3  anti-abuse: audit trail ..................... PASS
+       GET /api/events/chk-051340-a/export/audit.csv  as bb_demo_organizer_5c1e  -> 200
+       GET /api/events/chk-051340-a/export/audit.csv  as bb_demo_judge_a_8d24f1  -> 403
+T4  REST API with an OpenAPI document ........... PASS
+       GET /api/schema  as anonymous  -> 200
+       GET /api/events  as anonymous  -> 200
+T4  webhooks .................................... PASS
+       POST /events/chk-051340-a/manage/webhooks  as organizer@ballotbench.local  -> 422
+       POST /events/chk-051340-a/manage/webhooks  as organizer@ballotbench.local  -> 302
+       POST /events/chk-051340-a/manage/tracks  as organizer@ballotbench.local  -> 302
+       GET /events/chk-051340-a/manage/webhooks  as organizer@ballotbench.local  -> 200
+       GET /events/chk-051340-a/manage/webhooks  as bb_demo_participant_61  -> 403
+T4  certificate and record generation ........... PASS
+       GET /events/sample-hack-2026/certificate  as diego.herrera@example.org  -> 200
+       GET /events/sample-hack-2026/certificate?person=diego.herrera@example.org  as ines.rocha@example.org  -> 404
+       GET /api/participant/record?event=sample-hack-2026  as bb_demo_participant_61  -> 200
+T4  signed, publicly verifiable judge records ... PASS
+       GET /.well-known/ballotbench-signing-key  as anonymous  -> 200
+       GET /api/judge/record?event=sample-hack-2026  as bb_demo_judge_a_8d24f1  -> 200
+       POST /api/verify  as anonymous  -> 200
+       POST /api/verify  as anonymous  -> 200
+       GET /api/judge/record?event=sample-hack-2026&judge=jdg_24  as bb_demo_judge_b_3a9e77  -> 403
+T4  embeddable gallery widget ................... PASS
+       GET /embed.js  as anonymous  -> 200
+       GET /embed/sample-hack-2026  as anonymous  -> 200
+       GET /projects  as anonymous  -> 200
+T4  bulk import and export ...................... PASS
+       GET /api/events/chk-051340-a/export/bundle.json  as bb_demo_organizer_5c1e  -> 200
+       POST /api/events/import?slug=chk-051340-a-copy&name=Imported%20051340  as admin@ballotbench.local  -> 201
+       GET /api/events/chk-051340-a-copy/export/bundle.json  as bb_demo_organizer_5c1e  -> 403
+       GET /api/events/chk-051340-a-copy/export/bundle.json  as admin@ballotbench.local  -> 200
+       POST /api/events/import?slug=chk-051340-a-copy-2  as bb_demo_organizer_5c1e  -> 403
+       GET /api/events/chk-051340-a/export/registrations.csv  as bb_demo_organizer_5c1e  -> 200
+       GET /api/events/chk-051340-a/export/teams.csv  as bb_demo_organizer_5c1e  -> 200
+       GET /api/events/chk-051340-a/export/projects.csv  as bb_demo_organizer_5c1e  -> 200
+       GET /api/events/chk-051340-a/export/scores.csv  as bb_demo_organizer_5c1e  -> 200
+       GET /api/events/chk-051340-a/export/results.csv  as bb_demo_organizer_5c1e  -> 200
+       GET /api/events/chk-051340-a/export/audit.csv  as bb_demo_organizer_5c1e  -> 200
+
+T3: 9 of 9 checks pass
+T4: 6 of 6 checks pass

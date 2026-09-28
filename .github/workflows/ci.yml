@@ -47,6 +47,8 @@ jobs:
           tail -1 report.txt | grep -qx "claimed T1 T2, verified T1 T2"
       - name: Isolation probe
         run: sh scripts/isolation_curl.sh
+      - name: T3 and T4 checker
+        run: python3 scripts/check_t3_t4.py .dogfood.toml
       - name: Audit chain
         run: docker compose exec -T web python manage.py verify_audit
       - name: Fresh volume, no network

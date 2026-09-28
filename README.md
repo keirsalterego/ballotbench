@@ -164,6 +164,35 @@ they're published.
   Ed25519-signed document anyone can verify offline, so the portal can be held
   to what it published.
 
+## T3 and T4, checked the same way
+
+`run.py` only has checks for T1 and T2, so `.dogfood.toml` claims those two.
+T3 and T4 are checked by [`scripts/check_t3_t4.py`](scripts/check_t3_t4.py),
+written in the same style: one standard-library file, plain HTTP against
+the running portal, the same `.dogfood.toml`. It prints the exact request
+and status behind every result, and CI runs it on every push. Its output is
+committed as [`t3-t4-report.txt`](t3-t4-report.txt):
+
+```sh
+python3 scripts/check_t3_t4.py .dogfood.toml
+```
+
+| Spec bullet | Checks |
+|-|-|
+| **T3** Community voting: email gated, link based or authenticated | authenticated ballots (anonymous 401, an unconfirmed account 403); email-gated ballots through a mailed link that confirms only on a button press; the quadratic budget (26 of 25 credits refused, 25 accepted) |
+| Project comments | anonymous 401, signed-in 201, public listing, an organizer hides one and it vanishes for everyone else |
+| Results hidden during the voting window | publishing refused with 409 while the vote is open, results 404 to the public and to voters, then published with community votes once it closes |
+| Randomized project ordering on ballots | three voters see different orders, each stable across requests, none simply by id |
+| Anti abuse: rate limits, duplicate detection, audit trail | one voter's 21st ballot save in ten minutes gets 429; a second spelling of one inbox is refused and logged; the fixture's duplicate submission is flagged; the audit export records votes, hidden comments and publication, every row with its chain hash, and is 403 to a judge |
+| **T4** REST API and webhooks | the OpenAPI document covers the voting, records and import routes; a webhook to a private address is refused, a public one is accepted and queues a delivery for the next change; 403 to a participant |
+| Certificate and record generation | a judge's certificate carries their signed record; someone else's is 404; a participant's signed record names their team |
+| Signed, publicly verifiable judge records | the public Ed25519 key is published; a judge's record verifies and carries no scores; a doctored copy doesn't; judge B asking for judge A's record gets 403 |
+| Embeddable gallery widget | `/embed.js` serves JavaScript; the embed lists the projects and is frameable; every other page stays `X-Frame-Options: DENY` |
+| Bulk import and export | the bundle export, a site admin importing it as a new event and exporting the same projects and scores back; an organizer importing gets 403; every CSV export |
+
+It creates its own events and accounts (never touching the fixture event),
+so run it against a demo stack, not a real event.
+
 ## Beyond T2 (tier T4)
 
 `.dogfood.toml` claims T1 and T2, the tiers `run.py` can verify. The public

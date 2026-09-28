@@ -1,3 +1,5 @@
+![ballotbench: hackathon judging you can defend](docs/banner.jpg)
+
 # ballotbench
 
 A self-hosted hackathon portal for submissions and judging, built for

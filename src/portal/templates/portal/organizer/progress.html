@@ -11,7 +11,7 @@
 
 <h2>Judges</h2>
 <div class="table-wrap"><table>
-  <thead><tr><th>Judge</th><th class="num">Assigned</th><th class="num">Done</th><th class="num">Started</th><th class="num">Not started</th><th class="num">Stepped aside</th><th>Done</th></tr></thead>
+  <thead><tr><th>Judge</th><th class="num">Assigned</th><th class="num">Done</th><th class="num">Started</th><th class="num">Not started</th><th class="num">Stepped aside</th><th>Progress</th></tr></thead>
   <tbody>{% for r in judges %}
   <tr>
     <td>{{ r.judge__name|default:r.judge__email }}</td>

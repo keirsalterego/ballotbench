@@ -49,6 +49,7 @@ class EventForm(forms.ModelForm):
         widgets = {f: forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
                    for f in ["submissions_open", "submissions_close", "judging_open", "judging_close",
                              "voting_open", "voting_close"]}
+        widgets["description"] = forms.Textarea(attrs={"rows": 3})
         help_texts = {"reviews_per_project": "k: how many judges review each project",
                       "slug": "used in URLs; can't be changed later"}
 

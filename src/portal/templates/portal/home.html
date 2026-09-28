@@ -1,0 +1,20 @@
+{% extends "portal/base.html" %}
+{% block title %}My events{% endblock %}
+{% block content %}
+<h1>My events</h1>
+{% if memberships %}
+<div class="table-wrap"><table>
+  <tr><th>Event</th><th>Role</th><th>Submissions close</th><th></th></tr>
+  {% for m in memberships %}
+  <tr>
+    <td>{{ m.event.name }}</td>
+    <td>{{ m.role }}</td>
+    <td>{{ m.event.submissions_close|date:"j M Y H:i" }} UTC</td>
+    <td>{% block actions %}{% endblock %}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% else %}
+<p class="muted">You aren't in any event yet.</p>
+{% endif %}
+{% endblock %}
